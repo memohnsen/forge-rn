@@ -4,10 +4,14 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
+import { formatToISO } from '@/utils/dateFormatter';
+import { createClerkSupabaseClient } from '@/services/supabase';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +30,13 @@ export default function CheckInScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { getToken, userId } = useAuth();
+
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase', skipCache: true });
+    });
+  }, [getToken]);
 
   // Form state
   const [sessionDate, setSessionDate] = useState(new Date());
@@ -64,22 +75,58 @@ export default function CheckInScreen() {
   const hasCompletedForm = goal.length > 0;
 
   const handleSubmit = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in before submitting a check-in.');
+      return;
+    }
 
-    // Navigate to confirmation
-    router.push({
-      pathname: '/check-in/confirmation',
-      params: {
-        overallScore: overallScore.toString(),
-        physicalScore: physicalScore.toString(),
-        mentalScore: mentalScore.toString(),
-        selectedLift,
-        selectedIntensity,
-      },
-    });
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.from('journal_daily_checkins').insert({
+        user_id: userId,
+        check_in_date: formatToISO(sessionDate),
+        selected_lift: selectedLift,
+        selected_intensity: selectedIntensity,
+        goal,
+        physical_strength: physicalStrength,
+        mental_strength: mentalStrength,
+        recovered,
+        confidence,
+        sleep,
+        energy,
+        stress,
+        soreness,
+        readiness,
+        focus,
+        excitement,
+        body_connection: bodyConnection,
+        concerns,
+        physical_score: physicalScore,
+        mental_score: mentalScore,
+        overall_score: overallScore,
+        created_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      router.push({
+        pathname: '/check-in/confirmation',
+        params: {
+          overallScore: overallScore.toString(),
+          physicalScore: physicalScore.toString(),
+          mentalScore: mentalScore.toString(),
+          selectedLift,
+          selectedIntensity,
+        },
+      });
+    } catch (err) {
+      console.error('Error submitting check-in:', err);
+      Alert.alert('Submission failed', 'Unable to save your check-in. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

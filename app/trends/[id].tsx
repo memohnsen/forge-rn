@@ -4,13 +4,14 @@ import { findChartById } from '@/utils/trends-data';
 import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  Platform,
   useColorScheme,
   View,
 } from 'react-native';
@@ -20,6 +21,7 @@ import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 export default function GraphDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
@@ -30,6 +32,16 @@ export default function GraphDetailScreen() {
 
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
   const [dateRangeEnd, setDateRangeEnd] = useState(new Date());
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (event.data.action.type !== 'GO_BACK') return;
+      event.preventDefault();
+      router.replace('/trends');
+    });
+    return unsubscribe;
+  }, [navigation, router]);
 
   if (isLoading && !chart) {
     return (

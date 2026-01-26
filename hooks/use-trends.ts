@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { CheckIn } from '@/models/CheckIn';
@@ -53,13 +53,19 @@ const buildMeetTotal = (report: CompReport) => {
 };
 
 export function useTrends() {
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isLoaded } = useAuth();
+  const getTokenRef = useRef(getToken);
+  const isRefreshingRef = useRef(false);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase' });
+      return getTokenRef.current({ template: 'supabase', skipCache: true });
     });
-  }, [getToken]);
+  }, []);
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
@@ -68,9 +74,15 @@ export function useTrends() {
   const [error, setError] = useState<Error | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!userId) return;
+    if (!isLoaded || !userId || isRefreshingRef.current) {
+      if (!isLoaded || !userId) {
+        setIsLoading(false);
+      }
+      return;
+    }
     setIsLoading(true);
     setError(null);
+    isRefreshingRef.current = true;
 
     try {
       const [checkInsResponse, sessionsResponse, compsResponse] = await Promise.all([
@@ -99,18 +111,23 @@ export function useTrends() {
       setSessionReports(sessionsResponse.data || []);
       setCompReports(compsResponse.data || []);
     } catch (err) {
+      const error =
+        err instanceof Error
+          ? err
+          : new Error(typeof err === 'string' ? err : 'Unknown trends error');
       console.error('[useTrends] Error fetching trends data:', err);
-      setError(err as Error);
+      setError(error);
     } finally {
+      isRefreshingRef.current = false;
       setIsLoading(false);
     }
-  }, [supabase, userId]);
+  }, [supabase, userId, isLoaded]);
 
   useEffect(() => {
-    if (userId) {
+    if (isLoaded && userId) {
       refresh();
     }
-  }, [userId, refresh]);
+  }, [userId, isLoaded, refresh]);
 
   const dataByChartId = useMemo<Record<string, TrendPoint[]>>(() => {
     return {

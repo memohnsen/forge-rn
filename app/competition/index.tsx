@@ -5,10 +5,13 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
+import { createClerkSupabaseClient } from '@/services/supabase';
+import { formatToISO } from '@/utils/dateFormatter';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -28,6 +31,13 @@ export default function CompetitionReflectionScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { getToken, userId } = useAuth();
+
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase', skipCache: true });
+    });
+  }, [getToken]);
 
   // Form state
   const [meetName, setMeetName] = useState('');
@@ -75,15 +85,66 @@ export default function CompetitionReflectionScreen() {
 
   const hasCompletedForm = meetName.length > 0 && bodyweight.length > 0;
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+  const calculateBest = (lift1: string, lift2: string, lift3: string) => {
+    const values = [lift1, lift2, lift3]
+      .map((value) => Number(value))
+      .filter((value) => !Number.isNaN(value));
+    return values.length ? Math.max(...values) : 0;
+  };
 
-    Alert.alert('Success!', 'Your competition report has been submitted.', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+  const handleSubmit = async () => {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in before submitting a competition report.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.from('journal_comp_report').insert({
+        user_id: userId,
+        meet: meetName,
+        selected_meet_type: selectedMeetType,
+        meet_date: formatToISO(meetDate),
+        bodyweight,
+        performance_rating: performanceRating,
+        physical_preparedness_rating: physicalPreparedness,
+        mental_preparedness_rating: mentalPreparedness,
+        nutrition,
+        hydration,
+        did_well: didWell,
+        needs_work: needsWork,
+        good_from_training: goodFromTraining,
+        cues,
+        focus: focusNextMeet,
+        satisfaction,
+        confidence,
+        pressure_handling: pressureHandling,
+        what_learned: whatLearned,
+        what_proud_of: whatProudOf,
+        snatch1,
+        snatch2,
+        snatch3,
+        cj1,
+        cj2,
+        cj3,
+        snatch_best: calculateBest(snatch1, snatch2, snatch3),
+        cj_best: calculateBest(cj1, cj2, cj3),
+        created_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert('Success!', 'Your competition report has been submitted.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err) {
+      console.error('Error submitting competition report:', err);
+      Alert.alert('Submission failed', 'Unable to save your competition report. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

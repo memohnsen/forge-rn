@@ -4,9 +4,12 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
+import { createClerkSupabaseClient } from '@/services/supabase';
+import { formatToISO } from '@/utils/dateFormatter';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -29,6 +32,13 @@ export default function WorkoutReflectionScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { getToken, userId } = useAuth();
+
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase', skipCache: true });
+    });
+  }, [getToken]);
 
   // Form state
   const [sessionDate, setSessionDate] = useState(new Date());
@@ -55,14 +65,45 @@ export default function WorkoutReflectionScreen() {
   const hasCompletedForm = cues.length > 0;
 
   const handleSubmit = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    if (!userId) {
+      Alert.alert('Sign in required', 'Please sign in before submitting a session reflection.');
+      return;
+    }
 
-    Alert.alert('Success!', 'Your session reflection has been submitted.', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.from('journal_session_report').insert({
+        user_id: userId,
+        session_date: formatToISO(sessionDate),
+        time_of_day: timeOfDay,
+        session_rpe: sessionRPE,
+        movement_quality: movementQuality,
+        focus,
+        misses,
+        cues,
+        feeling,
+        satisfaction,
+        confidence,
+        what_learned: whatLearned,
+        what_would_change: whatWouldChange,
+        selected_lift: selectedLift,
+        selected_intensity: selectedIntensity,
+        created_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert('Success!', 'Your session reflection has been submitted.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err) {
+      console.error('Error submitting session report:', err);
+      Alert.alert('Submission failed', 'Unable to save your session reflection. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

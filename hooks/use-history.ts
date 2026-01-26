@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { CheckIn } from '@/models/CheckIn';
@@ -29,12 +29,17 @@ interface UseHistoryDetailsReturn {
 
 export function useHistory(): UseHistoryReturn {
   const { getToken, userId } = useAuth();
+  const getTokenRef = useRef(getToken);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase' });
+      return getTokenRef.current({ template: 'supabase', skipCache: true });
     });
-  }, [getToken]);
+  }, []);
 
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
@@ -124,13 +129,18 @@ export function useHistoryDetails(
   type: HistoryFilter,
   id: number
 ): UseHistoryDetailsReturn {
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isLoaded } = useAuth();
+  const getTokenRef = useRef(getToken);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase' });
+      return getTokenRef.current({ template: 'supabase', skipCache: true });
     });
-  }, [getToken]);
+  }, []);
 
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
   const [session, setSession] = useState<SessionReport | null>(null);
@@ -140,7 +150,15 @@ export function useHistoryDetails(
 
   useEffect(() => {
     const fetchDetails = async () => {
-      if (!userId || !id) return;
+      if (!isLoaded) {
+        setIsLoading(true);
+        return;
+      }
+
+      if (!userId || !id) {
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
@@ -151,7 +169,8 @@ export function useHistoryDetails(
             .from('journal_daily_checkins')
             .select('*')
             .eq('id', id)
-            .single();
+            .eq('user_id', userId)
+            .maybeSingle();
 
           if (fetchError) throw fetchError;
           setCheckIn(data);
@@ -160,7 +179,8 @@ export function useHistoryDetails(
             .from('journal_session_report')
             .select('*')
             .eq('id', id)
-            .single();
+            .eq('user_id', userId)
+            .maybeSingle();
 
           if (fetchError) throw fetchError;
           setSession(data);
@@ -169,7 +189,8 @@ export function useHistoryDetails(
             .from('journal_comp_report')
             .select('*')
             .eq('id', id)
-            .single();
+            .eq('user_id', userId)
+            .maybeSingle();
 
           if (fetchError) throw fetchError;
           setComp(data);
@@ -183,7 +204,7 @@ export function useHistoryDetails(
     };
 
     fetchDetails();
-  }, [type, id, supabase, userId]);
+  }, [type, id, supabase, userId, isLoaded]);
 
   const deleteItem = useCallback(async (): Promise<boolean> => {
     try {

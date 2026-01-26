@@ -17,7 +17,7 @@ export const useHome = () => {
   // Create Supabase client with Clerk JWT
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase' });
+      return getToken({ template: 'supabase', skipCache: true });
     });
   }, [getToken]);
 
