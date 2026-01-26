@@ -48,3 +48,7 @@ app-example
 .env.development.local
 .env.test.local
 .env.production.local
+
+bun.lockb
+bun.lock
+package-lock.json
