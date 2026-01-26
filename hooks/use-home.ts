@@ -201,10 +201,34 @@ export const useHome = () => {
   );
 
   const updateUserMeet = useCallback(
-    async (userId: string, meetName: string, meetDate: string) => {
+    async (
+      userId: string,
+      meetName: string,
+      meetDate: string,
+      fallbackProfile?: Partial<User>
+    ) => {
       setIsLoading(true);
       setError(null);
       try {
+        if (fallbackProfile) {
+          const payload = {
+            user_id: userId,
+            next_competition: meetName,
+            next_competition_date: meetDate,
+            ...fallbackProfile,
+          };
+          const cleanedPayload = Object.fromEntries(
+            Object.entries(payload).filter(([, value]) => value !== undefined)
+          );
+
+          const { error } = await supabase
+            .from('journal_users')
+            .upsert(cleanedPayload, { onConflict: 'user_id' });
+
+          if (error) throw error;
+          return true;
+        }
+
         const { error } = await supabase
           .from('journal_users')
           .update({
@@ -214,9 +238,11 @@ export const useHome = () => {
           .eq('user_id', userId);
 
         if (error) throw error;
+        return true;
       } catch (err) {
         console.error('Error updating user meet:', err);
         setError(err as Error);
+        return false;
       } finally {
         setIsLoading(false);
       }
@@ -232,10 +258,10 @@ export const useHome = () => {
 
   const refreshData = useCallback(
     async (userId: string) => {
-      await Promise.all([fetchCheckIns(userId), fetchSessionReports(userId)]);
+      await Promise.all([fetchUsers(userId), fetchCheckIns(userId), fetchSessionReports(userId)]);
       calculateStreak();
     },
-    [fetchCheckIns, fetchSessionReports, calculateStreak]
+    [fetchUsers, fetchCheckIns, fetchSessionReports, calculateStreak]
   );
 
   return {

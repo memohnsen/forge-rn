@@ -1,7 +1,22 @@
+const parseDateString = (dateString: string): Date | null => {
+  if (!dateString) return null;
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    return new Date(year, month - 1, day);
+  }
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return null;
+  return date;
+};
+
 export const formatDate = (dateString: string): string | null => {
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+    const date = parseDateString(dateString);
+    if (!date) {
       return null;
     }
 
@@ -19,8 +34,8 @@ export const formatDate = (dateString: string): string | null => {
 
 export const formatDateShort = (dateString: string): string | null => {
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+    const date = parseDateString(dateString);
+    if (!date) {
       return null;
     }
 

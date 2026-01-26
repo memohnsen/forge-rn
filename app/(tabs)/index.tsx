@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -84,13 +85,56 @@ export default function HomeScreen() {
 
   const handleEditMeet = () => {
     setNewMeetName(user?.next_competition || '');
-    setNewMeetDate(user?.next_competition_date ? new Date(user.next_competition_date) : new Date());
+    const parseMeetDate = (value?: string) => {
+      if (!value) return new Date();
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+      if (match) {
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    };
+
+    setNewMeetDate(parseMeetDate(user?.next_competition_date));
     setEditMeetSheetShown(true);
   };
 
   const handleSaveMeet = async () => {
     if (!userId) return;
-    await updateUserMeet(userId, newMeetName, formatToISO(newMeetDate));
+    const fallbackProfile = user
+      ? undefined
+      : {
+          first_name: clerkUser?.firstName || '',
+          last_name: clerkUser?.lastName || '',
+          sport: 'Powerlifting',
+          years_of_experience: 0,
+          meets_per_year: 0,
+          goal: '',
+          biggest_struggle: '',
+          training_days: {},
+          current_tracking_method: '',
+          biggest_frustration: '',
+          reflection_frequency: '',
+          what_holding_back: '',
+          coach_email: null,
+          oura_refresh_token: null,
+          whoop_refresh_token: null,
+          store_token: false,
+          created_at: new Date().toISOString(),
+        };
+
+    const success = await updateUserMeet(
+      userId,
+      newMeetName,
+      formatToISO(newMeetDate),
+      fallbackProfile
+    );
+
+    if (!success) {
+      Alert.alert('Unable to save meet', 'Please try again.');
+      return;
+    }
+
     await fetchUsers(userId);
     setEditMeetSheetShown(false);
   };
@@ -211,28 +255,43 @@ export default function HomeScreen() {
 
             <View style={styles.formSection}>
               <Text style={styles.label}>Meet Date</Text>
-              <Pressable
-                style={[
-                  styles.dateButton,
-                  {
-                    backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
-                  },
-                ]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={{ color: isDark ? '#FFFFFF' : '#000000' }}>
-                  {newMeetDate.toLocaleDateString()}
-                </Text>
-              </Pressable>
+              {Platform.OS === 'android' && (
+                <Pressable
+                  style={[
+                    styles.dateButton,
+                    {
+                      backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                    },
+                  ]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: isDark ? '#FFFFFF' : '#000000' }}>
+                    {newMeetDate.toLocaleDateString()}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
-            {showDatePicker && (
+            {showDatePicker && Platform.OS === 'android' && (
               <DateTimePicker
                 value={newMeetDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="default"
                 onChange={(event, selectedDate) => {
-                  setShowDatePicker(Platform.OS === 'ios');
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setNewMeetDate(selectedDate);
+                  }
+                }}
+              />
+            )}
+            {Platform.OS === 'ios' && (
+              <DateTimePicker
+                value={newMeetDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
                   if (selectedDate) {
                     setNewMeetDate(selectedDate);
                   }
@@ -338,5 +397,8 @@ const styles = StyleSheet.create({
   dateButton: {
     borderRadius: 12,
     padding: 12,
+  },
+  dateRow: {
+    paddingVertical: 6,
   },
 });
