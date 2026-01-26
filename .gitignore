@@ -52,3 +52,7 @@ app-example
 bun.lockb
 bun.lock
 package-lock.json
+
+
+.claude/
+.vscode/
