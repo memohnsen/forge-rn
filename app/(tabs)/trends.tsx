@@ -1,4 +1,6 @@
 import { colors } from '@/constants/colors';
+import { CATEGORIES, DEFAULT_SELECTED, TIME_FRAMES, type ChartConfig, type ChartCategory } from '@/utils/trends-data';
+import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useMemo, useState } from 'react';
 import {
@@ -13,561 +15,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 
-type TrendPoint = { x: number; y: number };
-
-type ChartConfig = {
-  id: string;
-  title: string;
-  unit: string;
-  accentColor: string;
-  data: TrendPoint[];
-  yMin: number;
-  yMax: number;
-  yStep: number;
-};
-
-type ChartCategory = {
-  id: string;
-  label: string;
-  accentColor: string;
-  icon: string;
-  charts: ChartConfig[];
-};
-
-const TIME_FRAMES = ['Last 30 Days', 'Last 90 Days', 'Last 6 Months', 'Last 1 Year', 'All Time'];
-
-const buildSeries = (values: number[]): TrendPoint[] =>
-  values.map((value, index) => ({ x: index + 1, y: value }));
-
-const buildSeriesRange = (min: number, max: number, count = 12): TrendPoint[] => {
-  if (count <= 1) return [{ x: 1, y: max }];
-  const span = max - min || 1;
-  const values = Array.from({ length: count }, (_, index) => {
-    const t = index / (count - 1);
-    const wave = Math.sin(t * Math.PI * 2) * 0.12 + Math.cos(t * Math.PI * 3) * 0.06;
-    const value = min + span * (0.35 + 0.5 * t + wave);
-    const clamped = Math.min(max, Math.max(min, value));
-    return Number(clamped.toFixed(span > 20 ? 0 : 1));
-  });
-  return buildSeries(values);
-};
-
-const CHECK_IN_CHARTS: ChartConfig[] = [
-  {
-    id: 'checkin_overall',
-    title: 'Overall Readiness',
-    unit: '%',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-  {
-    id: 'checkin_physical',
-    title: 'Physical Readiness',
-    unit: '%',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-  {
-    id: 'checkin_mental',
-    title: 'Mental Readiness',
-    unit: '%',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-  {
-    id: 'checkin_physical_strength',
-    title: 'Physical Strength',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_mental_strength',
-    title: 'Mental Strength',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_recovery',
-    title: 'Recovery',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_confidence',
-    title: 'Confidence',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_sleep',
-    title: 'Sleep Quality',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_energy',
-    title: 'Energy',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_stress',
-    title: 'Stress',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_soreness',
-    title: 'Soreness',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_readiness',
-    title: 'Readiness',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_focus',
-    title: 'Focus',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_excitement',
-    title: 'Excitement',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'checkin_body_connection',
-    title: 'Body Connection',
-    unit: '',
-    accentColor: '#5AB48C',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-];
-
-const WORKOUT_CHARTS: ChartConfig[] = [
-  {
-    id: 'workout_rpe',
-    title: 'Session RPE',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_quality',
-    title: 'Movement Quality',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_focus',
-    title: 'Focus',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_misses',
-    title: 'Misses',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(0, 5),
-    yMin: 0,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_feeling',
-    title: 'Feeling',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_satisfaction',
-    title: 'Satisfaction',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'workout_confidence',
-    title: 'Confidence',
-    unit: '',
-    accentColor: '#5386E4',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-];
-
-const MEET_CHARTS: ChartConfig[] = [
-  {
-    id: 'meet_performance',
-    title: 'Performance Rating',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_physical_prep',
-    title: 'Physical Preparedness',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_mental_prep',
-    title: 'Mental Preparedness',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_total',
-    title: 'Total',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 500),
-    yMin: 0,
-    yMax: 500,
-    yStep: 100,
-  },
-  {
-    id: 'meet_satisfaction',
-    title: 'Satisfaction',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_confidence',
-    title: 'Confidence',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_pressure',
-    title: 'Pressure Handling',
-    unit: '',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(1, 5),
-    yMin: 1,
-    yMax: 5,
-    yStep: 1,
-  },
-  {
-    id: 'meet_bodyweight',
-    title: 'Bodyweight',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 200),
-    yMin: 0,
-    yMax: 200,
-    yStep: 20,
-  },
-  {
-    id: 'meet_snatch_best',
-    title: 'Snatch Best',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 250),
-    yMin: 0,
-    yMax: 250,
-    yStep: 50,
-  },
-  {
-    id: 'meet_cj_best',
-    title: 'Clean & Jerk Best',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 300),
-    yMin: 0,
-    yMax: 300,
-    yStep: 50,
-  },
-  {
-    id: 'meet_squat_best',
-    title: 'Squat Best',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 500),
-    yMin: 0,
-    yMax: 500,
-    yStep: 100,
-  },
-  {
-    id: 'meet_bench_best',
-    title: 'Bench Best',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 300),
-    yMin: 0,
-    yMax: 300,
-    yStep: 50,
-  },
-  {
-    id: 'meet_deadlift_best',
-    title: 'Deadlift Best',
-    unit: 'kg',
-    accentColor: '#FFBF00',
-    data: buildSeriesRange(0, 500),
-    yMin: 0,
-    yMax: 500,
-    yStep: 100,
-  },
-];
-
-const OURA_CHARTS: ChartConfig[] = [
-  {
-    id: 'oura_sleep',
-    title: 'Sleep Duration',
-    unit: 'hrs',
-    accentColor: '#64B4DC',
-    data: buildSeriesRange(0, 12),
-    yMin: 0,
-    yMax: 12,
-    yStep: 3,
-  },
-  {
-    id: 'oura_hrv',
-    title: 'HRV',
-    unit: 'ms',
-    accentColor: '#64B4DC',
-    data: buildSeriesRange(0, 200),
-    yMin: 0,
-    yMax: 200,
-    yStep: 50,
-  },
-  {
-    id: 'oura_heart_rate',
-    title: 'Average Heart Rate',
-    unit: 'bpm',
-    accentColor: '#64B4DC',
-    data: buildSeriesRange(20, 80),
-    yMin: 20,
-    yMax: 80,
-    yStep: 20,
-  },
-  {
-    id: 'oura_readiness',
-    title: 'Readiness Score',
-    unit: '%',
-    accentColor: '#64B4DC',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-];
-
-const WHOOP_CHARTS: ChartConfig[] = [
-  {
-    id: 'whoop_recovery',
-    title: 'Recovery Score',
-    unit: '%',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-  {
-    id: 'whoop_sleep',
-    title: 'Sleep Duration',
-    unit: 'hrs',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(0, 12),
-    yMin: 0,
-    yMax: 12,
-    yStep: 3,
-  },
-  {
-    id: 'whoop_sleep_performance',
-    title: 'Sleep Performance',
-    unit: '%',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(0, 100),
-    yMin: 0,
-    yMax: 100,
-    yStep: 20,
-  },
-  {
-    id: 'whoop_strain',
-    title: 'Strain',
-    unit: '',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(0, 21),
-    yMin: 0,
-    yMax: 21,
-    yStep: 3,
-  },
-  {
-    id: 'whoop_hrv',
-    title: 'HRV',
-    unit: 'ms',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(0, 200),
-    yMin: 0,
-    yMax: 200,
-    yStep: 50,
-  },
-  {
-    id: 'whoop_resting_hr',
-    title: 'Resting Heart Rate',
-    unit: 'bpm',
-    accentColor: '#DC6464',
-    data: buildSeriesRange(20, 80),
-    yMin: 20,
-    yMax: 80,
-    yStep: 20,
-  },
-];
-
-const CATEGORIES: ChartCategory[] = [
-  {
-    id: 'Check-Ins',
-    label: 'Check-Ins',
-    accentColor: '#5AB48C',
-    icon: 'chart-line-variant',
-    charts: CHECK_IN_CHARTS,
-  },
-  {
-    id: 'Workouts',
-    label: 'Workouts',
-    accentColor: '#5386E4',
-    icon: 'weight-lifter',
-    charts: WORKOUT_CHARTS,
-  },
-  {
-    id: 'Meets',
-    label: 'Meets',
-    accentColor: '#FFBF00',
-    icon: 'trophy-award',
-    charts: MEET_CHARTS,
-  },
-  {
-    id: 'Oura',
-    label: 'Oura',
-    accentColor: '#64B4DC',
-    icon: 'moon-waning-crescent',
-    charts: OURA_CHARTS,
-  },
-  {
-    id: 'Whoop',
-    label: 'Whoop',
-    accentColor: '#DC6464',
-    icon: 'heart-pulse',
-    charts: WHOOP_CHARTS,
-  },
-];
-
-const DEFAULT_SELECTED = new Set<string>([
-  'checkin_overall',
-  'checkin_physical',
-  'workout_rpe',
-  'meet_total',
-  'oura_sleep',
-  'whoop_recovery',
-]);
 
 export default function TrendsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [selectedFilter, setSelectedFilter] = useState('Check-Ins');
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
@@ -704,8 +157,8 @@ export default function TrendsScreen() {
                 <TrendCard
                   key={chart.id}
                   chart={chart}
-                  timeFrame={selectedTimeFrame}
                   isDark={isDark}
+                  onPress={() => router.push({ pathname: '/trends/[id]', params: { id: chart.id } })}
                 />
               ))}
           </View>
@@ -752,21 +205,22 @@ export default function TrendsScreen() {
 
 function TrendCard({
   chart,
-  timeFrame,
   isDark,
+  onPress,
 }: {
   chart: ChartConfig;
-  timeFrame: string;
   isDark: boolean;
+  onPress: () => void;
 }) {
-  const latest = chart.data[chart.data.length - 1]?.y ?? 0;
-  const first = chart.data[0]?.y ?? 0;
+  const latest = chart.data[chart.data.length - 1]?.value ?? 0;
+  const first = chart.data[0]?.value ?? 0;
   const delta = latest - first;
   const isPositive = delta >= 0;
   const deltaValue = Math.abs(delta).toFixed(chart.unit === '%' || chart.unit === '' ? 1 : 0);
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={[
         styles.chartCard,
         {
@@ -809,7 +263,7 @@ function TrendCard({
           yStep={chart.yStep}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1007,7 +461,7 @@ function Sparkline({
   const points = data.map((point, index) => {
     const x =
       padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
-    const normalized = (point.y - minY) / span;
+    const normalized = (point.value - minY) / span;
     const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
     return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
   });
@@ -1053,7 +507,7 @@ function Sparkline({
       {data.map((point, index) => {
         const x =
           padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
-        const normalized = (point.y - minY) / span;
+        const normalized = (point.value - minY) / span;
         const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
         return <Circle key={`dot-${index}`} cx={x} cy={y} r={2} fill={color} />;
       })}

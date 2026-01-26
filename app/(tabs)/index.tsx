@@ -322,9 +322,9 @@ const styles = StyleSheet.create({
   },
   headerOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: -10,
+    left: -3,
+    right: -3,
   },
   headerBlur: {
     flex: 1,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingBottom: 16,
     justifyContent: 'flex-end',
   },
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     gap: 16,
-    paddingBottom: 60,
+    paddingBottom: 100,
   },
   modalOverlay: {
     flex: 1,
