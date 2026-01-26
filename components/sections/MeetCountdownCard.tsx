@@ -1,10 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, Pressable, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-import { useTheme } from '@/hooks/use-theme';
-import { Card } from '@/components/ui/Card';
+import { colors } from '@/constants/colors';
 
 interface MeetCountdownCardProps {
   meetName: string;
@@ -12,108 +9,146 @@ interface MeetCountdownCardProps {
   daysUntilMeetText: string;
   meetDate: string;
   sessionsLeftText: string;
+  onPress?: () => void;
 }
 
-export const MeetCountdownCard = ({
+export const MeetCountdownCard: React.FC<MeetCountdownCardProps> = ({
   meetName,
   daysUntilMeet,
   daysUntilMeetText,
   meetDate,
   sessionsLeftText,
-}: MeetCountdownCardProps) => {
-  const theme = useTheme();
-  const countdownColor =
-    daysUntilMeet < 0
-      ? theme.successGreen
-      : daysUntilMeet <= 7
-        ? theme.dangerRed
-        : daysUntilMeet <= 14
-          ? theme.checkInOrange
-          : theme.blueEnergy;
+  onPress,
+}) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const countdownColor = (() => {
+    if (daysUntilMeet < 0) {
+      return colors.scoreGreen;
+    } else if (daysUntilMeet <= 7) {
+      return colors.scoreRed;
+    } else if (daysUntilMeet <= 14) {
+      return colors.checkInOrange;
+    } else {
+      return colors.blueEnergy;
+    }
+  })();
 
   return (
-    <Card accentColor={countdownColor}>
-      <View style={styles.row}>
-        <View style={styles.column}>
-          <View style={styles.meetRow}>
-            <Ionicons name="flag" size={14} color={theme.gold} />
-            <Text style={[styles.meetName, { color: theme.text }]} numberOfLines={1}>
-              {meetName}
-            </Text>
+    <Pressable onPress={onPress} style={styles.wrapper}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+            shadowColor: countdownColor,
+            borderColor: `${countdownColor}40`,
+          },
+        ]}
+      >
+        <View style={styles.content}>
+          <View style={styles.topRow}>
+            <View style={styles.leftSection}>
+              <View style={styles.meetNameRow}>
+                <Ionicons name="flag" size={14} color={colors.gold} />
+                <Text
+                  style={[styles.meetName, { color: isDark ? '#FFFFFF' : '#000000' }]}
+                  numberOfLines={1}
+                >
+                  {meetName}
+                </Text>
+              </View>
+              <Text style={[styles.sessionsLeft, { color: countdownColor }]}>
+                {sessionsLeftText}
+              </Text>
+            </View>
+
+            <View style={styles.rightSection}>
+              <Text style={styles.meetDate}>{meetDate}</Text>
+              <Text style={[styles.daysLeft, { color: colors.gold }]}>{daysUntilMeetText}</Text>
+            </View>
           </View>
-          <Text style={[styles.sessions, { color: countdownColor }]}>{sessionsLeftText}</Text>
-        </View>
-        <View style={styles.columnRight}>
-          <Text style={[styles.meetDate, { color: theme.textSecondary }]}>{meetDate}</Text>
-          <Text style={[styles.daysText, { color: theme.gold }]}>{daysUntilMeetText}</Text>
+
+          {daysUntilMeet <= 0 && (
+            <>
+              <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#E5E5E5' }]} />
+              <View style={styles.editRow}>
+                <Ionicons name="pencil-outline" size={12} color="#999" />
+                <Text style={styles.editText}>Tap to edit meet details</Text>
+                <View style={{ flex: 1 }} />
+                <Ionicons name="chevron-forward" size={12} color="#666" />
+              </View>
+            </>
+          )}
         </View>
       </View>
-      {daysUntilMeet <= 0 && (
-        <View style={styles.footer}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.08)', 'transparent']}
-            style={styles.divider}
-          />
-          <View style={styles.footerRow}>
-            <Ionicons name="pencil" size={12} color={theme.textSecondary} />
-            <Text style={[styles.footerText, { color: theme.textSecondary }]}>Tap to edit meet details</Text>
-            <Ionicons name="chevron-forward" size={12} color={theme.textTertiary} />
-          </View>
-        </View>
-      )}
-    </Card>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+  wrapper: {
+    marginHorizontal: 16,
   },
-  column: {
+  container: {
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  content: {
+    padding: 18,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  leftSection: {
     flex: 1,
     gap: 8,
   },
-  columnRight: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  meetRow: {
+  meetNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   meetName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
+    flex: 1,
   },
-  sessions: {
-    fontSize: 26,
+  sessionsLeft: {
+    fontSize: 20,
     fontWeight: '700',
+  },
+  rightSection: {
+    alignItems: 'flex-end',
+    gap: 8,
   },
   meetDate: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#999',
   },
-  daysText: {
-    fontSize: 26,
+  daysLeft: {
+    fontSize: 20,
     fontWeight: '700',
-  },
-  footer: {
-    marginTop: 14,
   },
   divider: {
     height: 1,
-    marginBottom: 12,
+    marginVertical: 14,
   },
-  footerRow: {
+  editRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  footerText: {
+  editText: {
     fontSize: 12,
-    flex: 1,
+    color: '#999',
   },
 });

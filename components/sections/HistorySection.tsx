@@ -1,89 +1,128 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View, Text, StyleSheet, Pressable, useColorScheme, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { CheckIn } from '@/models/CheckIn';
+import { colors } from '@/constants/colors';
+import { formatDate } from '@/utils/dateFormatter';
 
-import { useTheme } from '@/hooks/use-theme';
-import { ProgressView } from '@/components/ui/ProgressView';
-import { Card } from '@/components/ui/Card';
-import type { DailyCheckIn } from '@/models/CheckIn';
-import { formatDateString } from '@/utils/dateFormatter';
-
-interface HistorySectionProps {
-  checkins: DailyCheckIn[];
-  loading: boolean;
+interface HistoryItemCardProps {
+  intensity: string;
+  lift: string;
+  date: string;
+  score: number;
+  onPress: () => void;
 }
 
-const HistoryItemCard = ({
-  item,
+const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
+  intensity,
+  lift,
+  date,
+  score,
   onPress,
-}: {
-  item: DailyCheckIn;
-  onPress?: () => void;
-  href?: string;
 }) => {
-  const theme = useTheme();
-  const score = item.overall_score;
-  const scoreColor = score >= 80 ? theme.successGreen : score >= 60 ? theme.warningOrange : theme.dangerRed;
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const scoreColor = (() => {
+    if (score >= 80) {
+      return colors.scoreGreen;
+    } else if (score >= 60) {
+      return colors.scoreYellow;
+    } else {
+      return colors.scoreRed;
+    }
+  })();
 
   return (
-    <Pressable onPress={onPress}>
-      <Card accentColor={scoreColor} style={styles.historyCard}>
-        <View style={styles.historyRow}>
-          <View style={[styles.scoreCircle, { borderColor: `${scoreColor}66` }]}> 
-            <Text style={[styles.scoreText, { color: scoreColor }]}>{score}</Text>
-          </View>
-        <View style={styles.historyDetails}>
-          <Text style={[styles.historyTitle, { color: theme.text }]} numberOfLines={1}>
-            {item.selected_intensity} {item.selected_lift}
-          </Text>
-          <Text style={[styles.historyDate, { color: theme.textSecondary }]}> 
-            {formatDateString(item.check_in_date)}
-          </Text>
-        </View>
-          <Ionicons name="chevron-forward" size={14} color={theme.textTertiary} />
-        </View>
-      </Card>
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.itemCard,
+        {
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        },
+      ]}
+    >
+      <View style={[styles.scoreCircle, { borderColor: `${scoreColor}66` }]}>
+        <Text style={[styles.scoreText, { color: scoreColor }]}>{score}</Text>
+      </View>
+
+      <View style={styles.itemTextContainer}>
+        <Text
+          style={[styles.itemTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}
+          numberOfLines={1}
+        >
+          {intensity} {lift}
+        </Text>
+        <Text style={styles.itemDate}>{date}</Text>
+      </View>
+
+      <Ionicons name="chevron-forward" size={16} color="#666" />
     </Pressable>
   );
 };
 
-export const HistorySection = ({ checkins, loading }: HistorySectionProps) => {
-  const theme = useTheme();
+interface HistorySectionProps {
+  checkIns: CheckIn[];
+  isLoading: boolean;
+}
 
-  if (loading) {
+export const HistorySection: React.FC<HistorySectionProps> = ({ checkIns, isLoading }) => {
+  const router = useRouter();
+
+  if (isLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>RECENT ACTIVITY</Text>
-          <Link href="/history" asChild>
-            <Text style={[styles.headerLink, { color: theme.blueEnergy }]}>View All</Text>
-          </Link>
+          <Text style={styles.headerTitle}>RECENT ACTIVITY</Text>
+          <Pressable onPress={() => router.push('/history' as any)}>
+            <Text style={[styles.viewAllText, { color: colors.blueEnergy }]}>View All</Text>
+          </Pressable>
         </View>
-        <ProgressView maxNum={3} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.blueEnergy} />
+        </View>
       </View>
     );
   }
 
-  if (!checkins.length) {
+  if (checkIns.length === 0) {
     return null;
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>RECENT ACTIVITY</Text>
-        <Link href="/history" asChild>
-          <Pressable style={styles.headerLinkRow}>
-            <Text style={[styles.headerLink, { color: theme.blueEnergy }]}>View All</Text>
-            <Ionicons name="chevron-forward" size={12} color={theme.blueEnergy} />
-          </Pressable>
-        </Link>
+        <Text style={styles.headerTitle}>RECENT ACTIVITY</Text>
+        <Pressable
+          onPress={() => router.push('/history' as any)}
+          style={styles.viewAllButton}
+        >
+          <Text style={[styles.viewAllText, { color: colors.blueEnergy }]}>View All</Text>
+          <Ionicons name="chevron-forward" size={12} color={colors.blueEnergy} />
+        </Pressable>
       </View>
-      {checkins.slice(0, 5).map((item) => (
-        <Link key={item.id ?? item.check_in_date} href={{ pathname: '/history/[id]', params: { id: item.id ?? item.check_in_date } }} asChild>
-          <HistoryItemCard item={item} />
-        </Link>
+
+      {checkIns.slice(0, 5).map((checkIn) => (
+        <HistoryItemCard
+          key={checkIn.id}
+          intensity={checkIn.selected_intensity}
+          lift={checkIn.selected_lift}
+          date={formatDate(checkIn.check_in_date) || checkIn.check_in_date}
+          score={checkIn.overall_score}
+          onPress={() =>
+            router.push({
+              pathname: '/history/[id]' as any,
+              params: {
+                id: checkIn.id?.toString() || '',
+                title: checkIn.selected_lift,
+                date: checkIn.check_in_date,
+              },
+            })
+          }
+        />
       ))}
     </View>
   );
@@ -97,52 +136,64 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   headerTitle: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#999',
+    letterSpacing: 0.5,
   },
-  headerLink: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  headerLinkRow: {
+  viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  historyCard: {
-    paddingHorizontal: 0,
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
-  historyRow: {
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
     gap: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   scoreCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
     borderWidth: 3,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
   },
   scoreText: {
     fontSize: 14,
     fontWeight: '700',
   },
-  historyDetails: {
+  itemTextContainer: {
     flex: 1,
+    gap: 4,
   },
-  historyTitle: {
-    fontSize: 15,
+  itemTitle: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  historyDate: {
+  itemDate: {
     fontSize: 12,
-    marginTop: 4,
+    color: '#999',
   },
 });

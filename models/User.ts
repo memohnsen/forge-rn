@@ -1,4 +1,4 @@
-export interface Users {
+export interface User {
   id?: number;
   user_id: string;
   first_name: string;
@@ -15,11 +15,11 @@ export interface Users {
   biggest_frustration: string;
   reflection_frequency: string;
   what_holding_back: string;
-  coach_email?: string | null;
-  oura_refresh_token?: string | null;
-  whoop_refresh_token?: string | null;
-  store_token?: boolean | null;
-  created_at?: string | null;
+  coach_email?: string;
+  oura_refresh_token?: string;
+  whoop_refresh_token?: string;
+  store_token?: boolean;
+  created_at?: string;
 }
 
 export interface Sport {

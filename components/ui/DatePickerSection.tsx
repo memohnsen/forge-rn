@@ -1,0 +1,145 @@
+import { colors } from '@/constants/colors';
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+
+interface DatePickerSectionProps {
+  title: string;
+  value: Date;
+  onChange: (date: Date) => void;
+}
+
+export const DatePickerSection: React.FC<DatePickerSectionProps> = ({
+  title,
+  value,
+  onChange,
+}) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const [showPicker, setShowPicker] = useState(false);
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+    }
+    if (selectedDate) {
+      onChange(selectedDate);
+    }
+  };
+
+  const formattedDate = value.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          shadowColor: colors.blueEnergy,
+          borderColor: `${colors.blueEnergy}33`,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <LinearGradient
+          colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.iconCircle}
+        >
+          <Ionicons name="calendar" size={18} color={colors.blueEnergy} />
+        </LinearGradient>
+        <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
+      </View>
+
+      {Platform.OS === 'ios' ? (
+        <DateTimePicker
+          value={value}
+          mode="date"
+          display="compact"
+          onChange={handleDateChange}
+          style={styles.iosPicker}
+          accentColor={colors.blueEnergy}
+        />
+      ) : (
+        <>
+          <Pressable
+            style={[
+              styles.dateButton,
+              {
+                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
+              },
+            ]}
+            onPress={() => setShowPicker(true)}
+          >
+            <Text style={[styles.dateText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              {formattedDate}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#999" />
+          </Pressable>
+
+          {showPicker && (
+            <DateTimePicker
+              value={value}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+            />
+          )}
+        </>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 16,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  iosPicker: {
+    alignSelf: 'flex-start',
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 14,
+  },
+  dateText: {
+    fontSize: 16,
+  },
+});

@@ -1,152 +1,266 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { DatePickerSection } from '@/components/ui/DatePickerSection';
+import { FormSubmitButton } from '@/components/ui/FormSubmitButton';
+import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
+import { SliderSection } from '@/components/ui/SliderSection';
+import { TextFieldSection } from '@/components/ui/TextFieldSection';
+import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen } from '@/components/layout/Screen';
-import { Card } from '@/components/ui/Card';
-import { DatePicker } from '@/components/ui/DatePicker';
-import { MultipleChoice } from '@/components/ui/MultipleChoice';
-import { Slider } from '@/components/ui/Slider';
-import { TextField } from '@/components/ui/TextField';
-import { Button } from '@/components/ui/Button';
-import { useCheckIn } from '@/hooks/use-check-in';
-import { createSupabaseClient } from '@/services/supabase';
-import { overallScore, mentalScore, physicalScore } from '@/utils/checkInScore';
-
-const liftOptions = ['Squat', 'Bench', 'Deadlift', 'Snatch', 'Clean & Jerk', 'Accessories'];
-const intensityOptions = ['Light', 'Moderate', 'Heavy', 'Max'];
+const LIFT_OPTIONS_PL = ['Squat', 'Bench', 'Deadlift', 'Total', 'Accessories', 'Other'];
+const LIFT_OPTIONS = ['Snatch', 'Clean', 'Jerk', 'C & J', 'Total', 'Squats', 'Accessories', 'Other'];
+const INTENSITY_OPTIONS = ['Maxing Out', 'Heavy', 'Moderate', 'Light'];
 
 export default function CheckInScreen() {
-  const { getToken, userId } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const supabase = useMemo(() => {
-    try {
-      return createSupabaseClient(async () => (await getToken()) ?? null);
-    } catch {
-      return null;
-    }
-  }, [getToken]);
-  const { state, setState, selectedLift, setSelectedLift, selectedIntensity, setSelectedIntensity, isComplete } = useCheckIn();
-  const [loading, setLoading] = useState(false);
 
-  const submit = async () => {
-    if (!userId || !supabase) return;
-    setLoading(true);
+  // Form state
+  const [sessionDate, setSessionDate] = useState(new Date());
+  const [selectedLift, setSelectedLift] = useState('Squat');
+  const [selectedIntensity, setSelectedIntensity] = useState('Moderate');
+  const [goal, setGoal] = useState('');
 
-    const payload = {
-      user_id: userId,
-      check_in_date: state.checkInDate.toISOString(),
-      selected_lift: selectedLift,
-      selected_intensity: selectedIntensity,
-      goal: state.goal,
-      physical_strength: state.physicalStrength,
-      mental_strength: state.mentalStrength,
-      recovered: state.recovered,
-      confidence: state.confidence,
-      sleep: state.sleep,
-      energy: state.energy,
-      stress: state.stress,
-      soreness: state.soreness,
-      readiness: state.readiness,
-      focus: state.focus,
-      excitement: state.excitement,
-      body_connection: state.bodyConnection,
-      concerns: state.concerns,
-      physical_score: physicalScore(state),
-      mental_score: mentalScore(state),
-      overall_score: overallScore(state),
-      created_at: new Date().toISOString(),
-    };
+  // Physical ratings
+  const [physicalStrength, setPhysicalStrength] = useState(3);
+  const [recovered, setRecovered] = useState(3);
+  const [energy, setEnergy] = useState(3);
+  const [soreness, setSoreness] = useState(3);
+  const [bodyConnection, setBodyConnection] = useState(3);
 
-    const { error } = await supabase.from('journal_daily_checkins').insert(payload);
-    setLoading(false);
+  // Mental ratings
+  const [mentalStrength, setMentalStrength] = useState(3);
+  const [confidence, setConfidence] = useState(3);
+  const [focus, setFocus] = useState(3);
+  const [stress, setStress] = useState(3);
+  const [readiness, setReadiness] = useState(3);
+  const [excitement, setExcitement] = useState(3);
+  const [sleep, setSleep] = useState(3);
 
-    if (error) {
-      Alert.alert('Check-In Failed', error.message);
-      return;
-    }
+  const [concerns, setConcerns] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-    router.push({ pathname: '/check-in/confirmation', params: { overall: overallScore(state).toString() } });
+  // Calculate scores
+  const physicalScore = Math.round(
+    ((physicalStrength + recovered + energy + (6 - soreness) + bodyConnection) / 25) * 100
+  );
+  const mentalScore = Math.round(
+    ((mentalStrength + confidence + focus + stress + excitement + readiness) / 30) * 100
+  );
+  const overallScore = Math.round((physicalScore + mentalScore) / 2);
+
+  const hasCompletedForm = goal.length > 0;
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setIsLoading(false);
+
+    // Navigate to confirmation
+    router.push({
+      pathname: '/check-in/confirmation',
+      params: {
+        overallScore: overallScore.toString(),
+        physicalScore: physicalScore.toString(),
+        mentalScore: mentalScore.toString(),
+        selectedLift,
+        selectedIntensity,
+      },
+    });
   };
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Card>
-          <DatePicker title="Session date:" value={state.checkInDate} onChange={(date) => setState({ ...state, checkInDate: date })} />
-        </Card>
-        <Card>
-          <MultipleChoice title="What's the main movement for the session?" options={liftOptions} selected={selectedLift} onSelect={setSelectedLift} />
-        </Card>
-        <Card>
-          <MultipleChoice title="What's the intensity for the session?" options={intensityOptions} selected={selectedIntensity} onSelect={setSelectedIntensity} />
-        </Card>
-        <Card>
-          <TextField
-            title="What would make today feel like a successful session for you?"
-            value={state.goal}
-            onChange={(goal) => setState({ ...state, goal })}
-          />
-        </Card>
-        <Card>
-          <Slider title="How strong does your body feel?" value={state.physicalStrength} min={1} max={5} minLabel="Weak" maxLabel="Strong" onChange={(value) => setState({ ...state, physicalStrength: value })} />
-        </Card>
-        <Card>
-          <Slider title="How recovered do you feel?" value={state.recovered} min={1} max={5} minLabel="Not At All" maxLabel="Very" onChange={(value) => setState({ ...state, recovered: value })} />
-        </Card>
-        <Card>
-          <Slider title="How energized do you feel?" value={state.energy} min={1} max={5} minLabel="Low" maxLabel="High" onChange={(value) => setState({ ...state, energy: value })} />
-        </Card>
-        <Card>
-          <Slider title="How sore does your body feel?" value={state.soreness} min={1} max={5} minLabel="None" maxLabel="Extreme" inverseColorRating onChange={(value) => setState({ ...state, soreness: value })} />
-        </Card>
-        <Card>
-          <Slider title="How connected do you feel to your body?" value={state.bodyConnection} min={1} max={5} minLabel="Disconnected" maxLabel="Very Connected" onChange={(value) => setState({ ...state, bodyConnection: value })} />
-        </Card>
-        <Card>
-          <Slider title="How strong does your mind feel?" value={state.mentalStrength} min={1} max={5} minLabel="Weak" maxLabel="Strong" onChange={(value) => setState({ ...state, mentalStrength: value })} />
-        </Card>
-        <Card>
-          <Slider title="How confident do you feel?" value={state.confidence} min={1} max={5} minLabel="Not At All" maxLabel="Very" onChange={(value) => setState({ ...state, confidence: value })} />
-        </Card>
-        <Card>
-          <Slider title="How focused do you feel?" value={state.focus} min={1} max={5} minLabel="Distracted" maxLabel="Very Focused" onChange={(value) => setState({ ...state, focus: value })} />
-        </Card>
-        <Card>
-          <Slider title="How stressed do you feel?" value={state.stress} min={1} max={5} minLabel="Extreme" maxLabel="Relaxed" onChange={(value) => setState({ ...state, stress: value })} />
-        </Card>
-        <Card>
-          <Slider title="How ready do you feel to train?" value={state.readiness} min={1} max={5} minLabel="Not Ready" maxLabel="Very Ready" onChange={(value) => setState({ ...state, readiness: value })} />
-        </Card>
-        <Card>
-          <Slider title="How excited do you feel about today's session?" value={state.excitement} min={1} max={5} minLabel="Not Excited" maxLabel="Very Excited" onChange={(value) => setState({ ...state, excitement: value })} />
-        </Card>
-        <Card>
-          <Slider title="Rate last night's sleep quality" value={state.sleep} min={1} max={5} minLabel="Poor" maxLabel="Great" onChange={(value) => setState({ ...state, sleep: value })} />
-        </Card>
-        <Card>
-          <TextField
-            title="What concerns or worries do you have going into today's session?"
-            value={state.concerns}
-            onChange={(concerns) => setState({ ...state, concerns })}
-          />
-        </Card>
-        <Button
-          label="Submit Check-In"
-          icon={<Ionicons name="checkmark-circle" size={18} color="white" />}
-          onPress={submit}
-          loading={loading}
-          disabled={!isComplete}
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+          Daily Check-In
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <DatePickerSection title="Session date:" value={sessionDate} onChange={setSessionDate} />
+
+        <MultipleChoiceSection
+          title="What's the main movement for the session?"
+          options={LIFT_OPTIONS}
+          selected={selectedLift}
+          onSelect={setSelectedLift}
+        />
+
+        <MultipleChoiceSection
+          title="What's the intensity for the session?"
+          options={INTENSITY_OPTIONS}
+          selected={selectedIntensity}
+          onSelect={setSelectedIntensity}
+        />
+
+        <TextFieldSection
+          title="What would make today feel like a successful session for you?"
+          value={goal}
+          onChangeText={setGoal}
+          placeholder="Enter your goal..."
+        />
+
+        <SliderSection
+          title="How strong does your body feel?"
+          value={physicalStrength}
+          onValueChange={setPhysicalStrength}
+          minString="Weak"
+          maxString="Strong"
+        />
+
+        <SliderSection
+          title="How recovered do you feel?"
+          value={recovered}
+          onValueChange={setRecovered}
+          minString="Not At All"
+          maxString="Very"
+        />
+
+        <SliderSection
+          title="How energized do you feel?"
+          value={energy}
+          onValueChange={setEnergy}
+          minString="Low"
+          maxString="High"
+        />
+
+        <SliderSection
+          title="How sore does your body feel?"
+          value={soreness}
+          onValueChange={setSoreness}
+          minString="None"
+          maxString="Extreme"
+          inverseColorRating
+        />
+
+        <SliderSection
+          title="How connected do you feel to your body?"
+          value={bodyConnection}
+          onValueChange={setBodyConnection}
+          minString="Disconnected"
+          maxString="Very Connected"
+        />
+
+        <SliderSection
+          title="How strong does your mind feel?"
+          value={mentalStrength}
+          onValueChange={setMentalStrength}
+          minString="Weak"
+          maxString="Strong"
+        />
+
+        <SliderSection
+          title="How confident do you feel?"
+          value={confidence}
+          onValueChange={setConfidence}
+          minString="Not At All"
+          maxString="Very"
+        />
+
+        <SliderSection
+          title="How focused do you feel?"
+          value={focus}
+          onValueChange={setFocus}
+          minString="Distracted"
+          maxString="Very Focused"
+        />
+
+        <SliderSection
+          title="How stressed do you feel?"
+          value={stress}
+          onValueChange={setStress}
+          minString="Extreme"
+          maxString="Relaxed"
+        />
+
+        <SliderSection
+          title="How ready do you feel to train?"
+          value={readiness}
+          onValueChange={setReadiness}
+          minString="Not Ready"
+          maxString="Very Ready"
+        />
+
+        <SliderSection
+          title="How excited do you feel about today's session?"
+          value={excitement}
+          onValueChange={setExcitement}
+          minString="Not Excited"
+          maxString="Very Excited"
+        />
+
+        <SliderSection
+          title="Rate last night's sleep quality"
+          value={sleep}
+          onValueChange={setSleep}
+          minString="Poor"
+          maxString="Great"
+        />
+
+        <TextFieldSection
+          title="What concerns or worries do you have going into today's session?"
+          value={concerns}
+          onChangeText={setConcerns}
+          placeholder="Enter any concerns..."
+        />
+
+        <FormSubmitButton
+          title="Submit Check-In"
+          icon="checkmark-circle"
+          isLoading={isLoading}
+          isEnabled={hasCompletedForm}
+          onPress={handleSubmit}
         />
       </ScrollView>
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    paddingVertical: 12,
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 16,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 8,
+    paddingBottom: 40,
   },
 });

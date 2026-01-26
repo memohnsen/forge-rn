@@ -20,25 +20,27 @@ export interface CompReport {
   pressure_handling: number;
   what_learned: string;
   what_proud_of: string;
-  snatch1?: string | null;
-  snatch2?: string | null;
-  snatch3?: string | null;
-  cj1?: string | null;
-  cj2?: string | null;
-  cj3?: string | null;
-  snatch_best?: number | null;
-  cj_best?: number | null;
-  squat1?: string | null;
-  squat2?: string | null;
-  squat3?: string | null;
-  bench1?: string | null;
-  bench2?: string | null;
-  bench3?: string | null;
-  deadlift1?: string | null;
-  deadlift2?: string | null;
-  deadlift3?: string | null;
-  squat_best?: number | null;
-  bench_best?: number | null;
-  deadlift_best?: number | null;
   created_at: string;
+  // Olympic Weightlifting fields
+  snatch1?: string;
+  snatch2?: string;
+  snatch3?: string;
+  cj1?: string;
+  cj2?: string;
+  cj3?: string;
+  snatch_best?: number;
+  cj_best?: number;
+  // Powerlifting fields
+  squat1?: string;
+  squat2?: string;
+  squat3?: string;
+  bench1?: string;
+  bench2?: string;
+  bench3?: string;
+  deadlift1?: string;
+  deadlift2?: string;
+  deadlift3?: string;
+  squat_best?: number;
+  bench_best?: number;
+  deadlift_best?: number;
 }

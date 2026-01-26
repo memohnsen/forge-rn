@@ -5,14 +5,20 @@ export const colors = {
   paleSlate: '#ABA8B2',
   silver: '#C3C3C3',
   gold: '#FFBF00',
-  checkInOrange: '#FFA050',
-  aiPurple: '#8C64C8',
-  successGreen: '#5AB48C',
-  warningOrange: '#FFB450',
-  dangerRed: '#DC6464',
-  historyPurple: '#8C78C8',
-  glassTintLight: 'rgba(255, 255, 255, 0.7)',
-  glassTintDark: 'rgba(20, 20, 26, 0.7)',
-};
 
-export type ColorName = keyof typeof colors;
+  // Check-in colors
+  checkInOrange: '#FFA050',
+
+  // Streak colors
+  streakOrange: '#FF9500',
+  streakRed: '#FF453A',
+  streakGray: '#8E8E93',
+
+  // Score colors
+  scoreGreen: '#5AB48C',
+  scoreYellow: '#FFB450',
+  scoreRed: '#DC6464',
+
+  // History purple
+  historyPurple: '#8C78C8',
+};

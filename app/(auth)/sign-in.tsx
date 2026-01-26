@@ -1,103 +1,204 @@
-import { useSignIn } from '@clerk/clerk-expo';
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  useColorScheme,
+  Platform,
+  Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSSO } from '@clerk/clerk-expo';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/constants/colors';
 
-import { Screen } from '@/components/layout/Screen';
-import { useTheme } from '@/hooks/use-theme';
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
-  const theme = useTheme();
-  const { signIn, setActive, isLoaded } = useSignIn();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const router = useRouter();
 
-  const handleSignIn = async () => {
-    if (!isLoaded || !signIn) return;
-    setLoading(true);
-    setError('');
+  const { startSSOFlow: startGoogleSSO } = useSSO();
+  const { startSSOFlow: startAppleSSO } = useSSO();
+
+  const handleGoogleSignIn = useCallback(async () => {
     try {
-      const result = await signIn.create({
-        identifier: email.trim(),
-        password,
+      const { createdSessionId, setActive } = await startGoogleSSO({
+        strategy: 'oauth_google',
       });
 
-      if (result.status === 'complete' && result.createdSessionId && setActive) {
-        await setActive({ session: result.createdSessionId });
-      } else {
-        setError('Additional verification required.');
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
       }
     } catch (err) {
-      setError((err as Error).message ?? 'Unable to sign in.');
-    } finally {
-      setLoading(false);
+      console.error('Google sign-in error:', err);
     }
-  };
+  }, [startGoogleSSO, router]);
+
+  const handleAppleSignIn = useCallback(async () => {
+    try {
+      const { createdSessionId, setActive } = await startAppleSSO({
+        strategy: 'oauth_apple',
+      });
+
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
+      }
+    } catch (err) {
+      console.error('Apple sign-in error:', err);
+    }
+  }, [startAppleSSO, router]);
 
   return (
-    <Screen>
-      <View style={styles.container}>
-        <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
-        <TextInput
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Email"
-          placeholderTextColor={theme.textTertiary}
-          value={email}
-          onChangeText={setEmail}
-          style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-        />
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor={theme.textTertiary}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-        />
-        {error ? <Text style={[styles.error, { color: theme.dangerRed }]}>{error}</Text> : null}
-        <Text
-          style={[styles.button, { backgroundColor: theme.blueEnergy }]}
-          onPress={loading ? undefined : handleSignIn}
-        >
-          {loading ? 'Signing In...' : 'Sign In'}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: isDark ? '#000000' : '#FFFFFF' }]}
+    >
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <LinearGradient
+            colors={[colors.blueEnergy, `${colors.blueEnergy}80`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logoContainer}
+          >
+            <Ionicons name="barbell" size={48} color="#FFFFFF" />
+          </LinearGradient>
+
+          <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Welcome to Forge
+          </Text>
+          <Text style={styles.subtitle}>
+            Your mental training journal for peak performance
+          </Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          {Platform.OS === 'ios' && (
+            <Pressable
+              onPress={handleAppleSignIn}
+              style={[
+                styles.button,
+                styles.appleButton,
+                { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
+              ]}
+            >
+              <Ionicons
+                name="logo-apple"
+                size={20}
+                color={isDark ? '#000000' : '#FFFFFF'}
+              />
+              <Text
+                style={[
+                  styles.buttonText,
+                  { color: isDark ? '#000000' : '#FFFFFF' },
+                ]}
+              >
+                Continue with Apple
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={handleGoogleSignIn}
+            style={[
+              styles.button,
+              styles.googleButton,
+              {
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                borderColor: isDark ? '#333' : '#E5E5E5',
+              },
+            ]}
+          >
+            <Image
+              source={{ uri: 'https://www.google.com/favicon.ico' }}
+              style={styles.googleIcon}
+            />
+            <Text
+              style={[
+                styles.buttonText,
+                { color: isDark ? '#FFFFFF' : '#000000' },
+              ]}
+            >
+              Continue with Google
+            </Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.terms}>
+          By continuing, you agree to our Terms of Service and Privacy Policy
         </Text>
       </View>
-    </Screen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    gap: 12,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   title: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
-    textAlign: 'center',
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+  subtitle: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  buttonContainer: {
+    gap: 12,
   },
   button: {
-    color: 'white',
-    textAlign: 'center',
-    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
     borderRadius: 12,
-    fontWeight: '600',
-    fontSize: 16,
+    gap: 12,
   },
-  error: {
+  appleButton: {},
+  googleButton: {
+    borderWidth: 1,
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  terms: {
     fontSize: 12,
+    color: '#999',
     textAlign: 'center',
+    marginTop: 24,
+    lineHeight: 18,
   },
 });

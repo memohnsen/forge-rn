@@ -11,8 +11,8 @@ export interface SessionReport {
   feeling: number;
   satisfaction: number;
   confidence: number;
-  what_learned?: string | null;
-  what_would_change?: string | null;
+  what_learned?: string;
+  what_would_change?: string;
   selected_lift: string;
   selected_intensity: string;
   created_at: string;

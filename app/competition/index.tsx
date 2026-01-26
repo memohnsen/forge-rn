@@ -1,53 +1,378 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { DatePickerSection } from '@/components/ui/DatePickerSection';
+import { FormSubmitButton } from '@/components/ui/FormSubmitButton';
+import { WLLiftResultsSection } from '@/components/ui/LiftResultsSection';
+import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
+import { SliderSection } from '@/components/ui/SliderSection';
+import { TextFieldSection } from '@/components/ui/TextFieldSection';
+import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen } from '@/components/layout/Screen';
-import { Card } from '@/components/ui/Card';
-import { TextField } from '@/components/ui/TextField';
-import { MultipleChoice } from '@/components/ui/MultipleChoice';
-import { Slider } from '@/components/ui/Slider';
-import { Button } from '@/components/ui/Button';
+const MEET_TYPES = ['Local', 'National', 'International'];
 
-const meetTypes = ['Local', 'National', 'International'];
+export default function CompetitionReflectionScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-export default function CompetitionScreen() {
+  // Form state
   const [meetName, setMeetName] = useState('');
-  const [meetType, setMeetType] = useState('Local');
-  const [nutrition, setNutrition] = useState('');
-  const [didWell, setDidWell] = useState('');
-  const [needsWork, setNeedsWork] = useState('');
+  const [selectedMeetType, setSelectedMeetType] = useState('Local');
+  const [meetDate, setMeetDate] = useState(new Date());
+  const [bodyweight, setBodyweight] = useState('');
+
+  // Lift results
+  const [snatch1, setSnatch1] = useState('');
+  const [snatch2, setSnatch2] = useState('');
+  const [snatch3, setSnatch3] = useState('');
+  const [cj1, setCj1] = useState('');
+  const [cj2, setCj2] = useState('');
+  const [cj3, setCj3] = useState('');
+  // const [squat1, setSquat1] = useState('');
+  // const [squat2, setSquat2] = useState('');
+  // const [squat3, setSquat3] = useState('');
+  // const [bench1, setBench1] = useState('');
+  // const [bench2, setBench2] = useState('');
+  // const [bench3, setBench3] = useState('');
+  // const [deadlift1, setDeadlift1] = useState('');
+  // const [deadlift2, setDeadlift2] = useState('');
+  // const [deadlift3, setDeadlift3] = useState('');
+
+  // Ratings
+  const [performanceRating, setPerformanceRating] = useState(3);
+  const [physicalPreparedness, setPhysicalPreparedness] = useState(3);
+  const [mentalPreparedness, setMentalPreparedness] = useState(3);
+  const [pressureHandling, setPressureHandling] = useState(3);
+  const [satisfaction, setSatisfaction] = useState(3);
   const [confidence, setConfidence] = useState(3);
 
+  // Text fields
+  const [nutrition, setNutrition] = useState('');
+  const [hydration, setHydration] = useState('');
+  const [didWell, setDidWell] = useState('');
+  const [whatProudOf, setWhatProudOf] = useState('');
+  const [goodFromTraining, setGoodFromTraining] = useState('');
+  const [cues, setCues] = useState('');
+  const [whatLearned, setWhatLearned] = useState('');
+  const [needsWork, setNeedsWork] = useState('');
+  const [focusNextMeet, setFocusNextMeet] = useState('');
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  const hasCompletedForm = meetName.length > 0 && bodyweight.length > 0;
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setIsLoading(false);
+
+    Alert.alert('Success!', 'Your competition report has been submitted.', [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
+  };
+
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Card>
-          <TextField title="Meet name" value={meetName} onChange={setMeetName} multiline={false} />
-        </Card>
-        <Card>
-          <MultipleChoice title="Meet type" options={meetTypes} selected={meetType} onSelect={setMeetType} />
-        </Card>
-        <Card>
-          <Slider title="Confidence" value={confidence} min={1} max={5} minLabel="Low" maxLabel="High" onChange={setConfidence} />
-        </Card>
-        <Card>
-          <TextField title="Nutrition and hydration" value={nutrition} onChange={setNutrition} />
-        </Card>
-        <Card>
-          <TextField title="What did you do well?" value={didWell} onChange={setDidWell} />
-        </Card>
-        <Card>
-          <TextField title="What needs work?" value={needsWork} onChange={setNeedsWork} />
-        </Card>
-        <Button label="Submit Analysis" icon={<Ionicons name="checkmark-circle" size={18} color="white" />} onPress={() => null} />
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={colors.gold} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+          Competition Report
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Meet Name Section */}
+        <View
+          style={[
+            styles.meetNameCard,
+            {
+              backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+              shadowColor: colors.blueEnergy,
+              borderColor: `${colors.blueEnergy}33`,
+            },
+          ]}
+        >
+          <View style={styles.meetNameHeader}>
+            <LinearGradient
+              colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconCircle}
+            >
+              <Ionicons name="trophy" size={18} color={colors.gold} />
+            </LinearGradient>
+            <Text style={styles.meetNameLabel}>Which meet did you compete at?</Text>
+          </View>
+          <TextInput
+            style={[
+              styles.meetNameInput,
+              {
+                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
+                color: isDark ? '#FFFFFF' : '#000000',
+              },
+            ]}
+            value={meetName}
+            onChangeText={setMeetName}
+            placeholder="Enter your meet..."
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <MultipleChoiceSection
+          title="What type of meet was this?"
+          options={MEET_TYPES}
+          selected={selectedMeetType}
+          onSelect={setSelectedMeetType}
+        />
+
+        <DatePickerSection title="Meet Date:" value={meetDate} onChange={setMeetDate} />
+
+        <TextFieldSection
+          title="What was your bodyweight?"
+          value={bodyweight}
+          onChangeText={setBodyweight}
+          placeholder="Enter bodyweight (kg)..."
+          multiline={true}
+        />
+
+        <WLLiftResultsSection
+          snatch1={snatch1}
+          snatch2={snatch2}
+          snatch3={snatch3}
+          cj1={cj1}
+          cj2={cj2}
+          cj3={cj3}
+          onChangeSnatch1={setSnatch1}
+          onChangeSnatch2={setSnatch2}
+          onChangeSnatch3={setSnatch3}
+          onChangeCj1={setCj1}
+          onChangeCj2={setCj2}
+          onChangeCj3={setCj3}
+        />
+        {/* <PLLiftResultsSection
+          squat1={squat1}
+          squat2={squat2}
+          squat3={squat3}
+          bench1={bench1}
+          bench2={bench2}
+          bench3={bench3}
+          deadlift1={deadlift1}
+          deadlift2={deadlift2}
+          deadlift3={deadlift3}
+          onChangeSquat1={setSquat1}
+          onChangeSquat2={setSquat2}
+          onChangeSquat3={setSquat3}
+          onChangeBench1={setBench1}
+          onChangeBench2={setBench2}
+          onChangeBench3={setBench3}
+          onChangeDeadlift1={setDeadlift1}
+          onChangeDeadlift2={setDeadlift2}
+          onChangeDeadlift3={setDeadlift3}
+        /> */}
+
+        <SliderSection
+          title="How would you rate your performance?"
+          value={performanceRating}
+          onValueChange={setPerformanceRating}
+          minString="Poor"
+          maxString="Amazing"
+        />
+
+        <SliderSection
+          title="How prepared did you feel physically going into the meet?"
+          value={physicalPreparedness}
+          onValueChange={setPhysicalPreparedness}
+          minString="Poor"
+          maxString="Amazing"
+        />
+
+        <SliderSection
+          title="How prepared did you feel mentally going into the meet?"
+          value={mentalPreparedness}
+          onValueChange={setMentalPreparedness}
+          minString="Poor"
+          maxString="Amazing"
+        />
+
+        <SliderSection
+          title="How did you handle pressure during the meet?"
+          value={pressureHandling}
+          onValueChange={setPressureHandling}
+          minString="Poorly"
+          maxString="Very Well"
+        />
+
+        <SliderSection
+          title="How satisfied do you feel with this meet?"
+          value={satisfaction}
+          onValueChange={setSatisfaction}
+          minString="Not Satisfied"
+          maxString="Very Satisfied"
+        />
+
+        <SliderSection
+          title="How confident do you feel after this meet?"
+          value={confidence}
+          onValueChange={setConfidence}
+          minString="Not Confident"
+          maxString="Very Confident"
+        />
+
+        <TextFieldSection
+          title="What was your nutrition like during the meet?"
+          value={nutrition}
+          onChangeText={setNutrition}
+          placeholder="Describe your nutrition..."
+        />
+
+        <TextFieldSection
+          title="What was your hydration like during the meet?"
+          value={hydration}
+          onChangeText={setHydration}
+          placeholder="Describe your hydration..."
+        />
+
+        <TextFieldSection
+          title="What did you do well?"
+          value={didWell}
+          onChangeText={setDidWell}
+          placeholder="Enter what went well..."
+        />
+
+        <TextFieldSection
+          title="What are you most proud of from this meet?"
+          value={whatProudOf}
+          onChangeText={setWhatProudOf}
+          placeholder="Enter what you're proud of..."
+        />
+
+        <TextFieldSection
+          title="What in training helped you feel prepared for the platform?"
+          value={goodFromTraining}
+          onChangeText={setGoodFromTraining}
+          placeholder="Enter what helped..."
+        />
+
+        <TextFieldSection
+          title="What cues worked best for you?"
+          value={cues}
+          onChangeText={setCues}
+          placeholder="Enter helpful cues..."
+        />
+
+        <TextFieldSection
+          title="What did you learn about yourself during this meet?"
+          value={whatLearned}
+          onChangeText={setWhatLearned}
+          placeholder="Enter any insights..."
+        />
+
+        <TextFieldSection
+          title="What could you have done better?"
+          value={needsWork}
+          onChangeText={setNeedsWork}
+          placeholder="Enter areas for improvement..."
+        />
+
+        <TextFieldSection
+          title="What do you need to focus on for the next meet?"
+          value={focusNextMeet}
+          onChangeText={setFocusNextMeet}
+          placeholder="Enter your focus areas..."
+        />
+
+        <FormSubmitButton
+          title="Submit Comp Report"
+          icon="trophy"
+          isLoading={isLoading}
+          isEnabled={hasCompletedForm}
+          accentColor={colors.gold}
+          onPress={handleSubmit}
+        />
       </ScrollView>
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    paddingVertical: 12,
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 16,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  meetNameCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    gap: 12,
+  },
+  meetNameHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  meetNameLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#999',
+  },
+  meetNameInput: {
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
   },
 });

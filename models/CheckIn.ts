@@ -1,4 +1,4 @@
-export interface DailyCheckIn {
+export interface CheckIn {
   id?: number;
   user_id: string;
   check_in_date: string;
@@ -17,7 +17,7 @@ export interface DailyCheckIn {
   focus: number;
   excitement: number;
   body_connection: number;
-  concerns?: string | null;
+  concerns?: string;
   physical_score: number;
   mental_score: number;
   overall_score: number;

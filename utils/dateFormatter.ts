@@ -1,29 +1,44 @@
-export const formatDateString = (value: string): string => {
-  const dateOnly = value.slice(0, 10);
-  const parsed = new Date(dateOnly);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
+export const formatDate = (dateString: string): string | null => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+
+    const options: Intl.DateTimeFormatOptions = {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    };
+
+    return date.toLocaleDateString('en-US', options);
+  } catch {
+    return null;
   }
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(parsed);
 };
 
-export const formatDate = (value: Date): string => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(value);
+export const formatDateShort = (dateString: string): string | null => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+
+    const options: Intl.DateTimeFormatOptions = {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    };
+
+    return date.toLocaleDateString('en-US', options);
+  } catch {
+    return null;
+  }
 };
 
-export const formatFullDate = (value: Date): string => {
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(value);
+export const formatToISO = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };

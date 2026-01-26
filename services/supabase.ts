@@ -1,26 +1,27 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY ?? '';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_KEY || '';
 
-export const createSupabaseClient = (getToken?: () => Promise<string | null>): SupabaseClient => {
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase URL/Key missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_KEY.');
-  }
-  return createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Function to create a Supabase client with Clerk JWT
+export const createClerkSupabaseClient = (getToken: () => Promise<string | null>) => {
+  return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
-      fetch: async (url, init = {}) => {
-        const headers = new Headers(init.headers ?? {});
-        if (getToken) {
-          const token = await getToken();
-          if (token) {
-            headers.set('Authorization', `Bearer ${token}`);
-          }
+      fetch: async (url, options = {}) => {
+        const clerkToken = await getToken();
+
+        const headers = new Headers(options?.headers);
+        if (clerkToken) {
+          headers.set('Authorization', `Bearer ${clerkToken}`);
         }
-        return fetch(url, { ...init, headers });
+
+        return fetch(url, {
+          ...options,
+          headers,
+        });
       },
     },
   });
 };
-
-export const supabase = supabaseUrl && supabaseKey ? createSupabaseClient() : null;
