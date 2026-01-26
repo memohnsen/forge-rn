@@ -1,5 +1,7 @@
 import { colors } from '@/constants/colors';
-import { CATEGORIES, DEFAULT_SELECTED, TIME_FRAMES, type ChartConfig, type ChartCategory } from '@/utils/trends-data';
+import { useTrends } from '@/hooks/use-trends';
+import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
+import { DEFAULT_SELECTED, TIME_FRAMES, type ChartConfig, type ChartCategory, type TrendPoint } from '@/utils/trends-data';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useMemo, useState } from 'react';
@@ -22,6 +24,8 @@ export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const { categories } = useTrends();
+
   const [selectedFilter, setSelectedFilter] = useState('Check-Ins');
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
   const [selectedCharts, setSelectedCharts] = useState<Set<string>>(DEFAULT_SELECTED);
@@ -29,17 +33,24 @@ export default function TrendsScreen() {
   const [showChartSelection, setShowChartSelection] = useState(false);
   const [showAIResults, setShowAIResults] = useState(false);
 
-  const isOuraConnected = true;
-  const isWhoopConnected = true;
+  const isOuraConnected = useMemo(() => {
+    const oura = categories.find((category) => category.id === 'Oura');
+    return Boolean(oura?.charts.some((chart) => chart.data.length > 0));
+  }, [categories]);
+
+  const isWhoopConnected = useMemo(() => {
+    const whoop = categories.find((category) => category.id === 'Whoop');
+    return Boolean(whoop?.charts.some((chart) => chart.data.length > 0));
+  }, [categories]);
 
   const availableCategories = useMemo(
     () =>
-      CATEGORIES.filter((category) => {
+      categories.filter((category) => {
         if (category.id === 'Oura') return isOuraConnected;
         if (category.id === 'Whoop') return isWhoopConnected;
         return true;
       }),
-    [isOuraConnected, isWhoopConnected]
+    [categories, isOuraConnected, isWhoopConnected]
   );
 
   const currentCategory = availableCategories.find((category) => category.id === selectedFilter);
@@ -153,14 +164,18 @@ export default function TrendsScreen() {
           <View style={styles.chartsWrapper}>
             {currentCategory.charts
               .filter((chart) => selectedCharts.has(chart.id))
-              .map((chart) => (
-                <TrendCard
-                  key={chart.id}
-                  chart={chart}
-                  isDark={isDark}
-                  onPress={() => router.push({ pathname: '/trends/[id]', params: { id: chart.id } })}
-                />
-              ))}
+              .map((chart) => {
+                const chartState = buildGraphDetailState(chart, selectedTimeFrame, new Date());
+                const displayChart = { ...chart, data: chartState.filteredData };
+                return (
+                  <TrendCard
+                    key={chart.id}
+                    chart={displayChart}
+                    isDark={isDark}
+                    onPress={() => router.push({ pathname: '/trends/[id]', params: { id: chart.id } })}
+                  />
+                );
+              })}
           </View>
         ) : (
           <View style={styles.emptyState}>

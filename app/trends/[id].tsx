@@ -1,4 +1,5 @@
 import { colors } from '@/constants/colors';
+import { useTrends } from '@/hooks/use-trends';
 import { findChartById } from '@/utils/trends-data';
 import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -22,12 +23,29 @@ export default function GraphDetailScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const { categories, isLoading, error } = useTrends();
 
-  const chartEntry = useMemo(() => (id ? findChartById(id) : null), [id]);
+  const chartEntry = useMemo(() => (id ? findChartById(id, categories) : null), [id, categories]);
   const chart = chartEntry?.chart;
 
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
   const [dateRangeEnd, setDateRangeEnd] = useState(new Date());
+
+  if (isLoading && !chart) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+        <Text style={styles.emptyText}>Loading trends...</Text>
+      </View>
+    );
+  }
+
+  if (error && !chart) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+        <Text style={styles.emptyText}>Unable to load chart data.</Text>
+      </View>
+    );
+  }
 
   if (!chart) {
     return (

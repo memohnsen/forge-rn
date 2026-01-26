@@ -602,8 +602,8 @@ export const DEFAULT_SELECTED = new Set<string>([
 
 export const TIME_FRAMES = ['Last 30 Days', 'Last 90 Days', 'Last 6 Months', 'Last 1 Year', 'All Time'];
 
-export const findChartById = (id: string) => {
-  for (const category of CATEGORIES) {
+export const findChartById = (id: string, categories: ChartCategory[] = CATEGORIES) => {
+  for (const category of categories) {
     const chart = category.charts.find((item) => item.id === id);
     if (chart) {
       return { chart, category };
