@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/services/supabase';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@clerk/clerk-expo';
+import { createClerkSupabaseClient } from '@/services/supabase';
 import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { CompReport } from '@/models/Competition';
@@ -26,9 +27,15 @@ interface UseHistoryDetailsReturn {
   deleteItem: () => Promise<boolean>;
 }
 
-const FAKE_USER_ID = 'user_2vH3UoiRGEC3ux7UPTAetUE2wAQ';
-
 export function useHistory(): UseHistoryReturn {
+  const { getToken, userId } = useAuth();
+
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase' });
+    });
+  }, [getToken]);
+
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
   const [compReports, setCompReports] = useState<CompReport[]>([]);
@@ -37,11 +44,12 @@ export function useHistory(): UseHistoryReturn {
   const [selectedFilter, setSelectedFilter] = useState<HistoryFilter>('Check-Ins');
 
   const fetchCheckIns = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data, error: fetchError } = await supabase
         .from('journal_daily_checkins')
         .select('*')
-        .eq('user_id', FAKE_USER_ID)
+        .eq('user_id', userId)
         .order('check_in_date', { ascending: false });
 
       if (fetchError) throw fetchError;
@@ -50,14 +58,15 @@ export function useHistory(): UseHistoryReturn {
       console.error('Error fetching check-ins:', err);
       setError(err as Error);
     }
-  }, []);
+  }, [supabase, userId]);
 
   const fetchSessionReports = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data, error: fetchError } = await supabase
         .from('journal_session_report')
         .select('*')
-        .eq('user_id', FAKE_USER_ID)
+        .eq('user_id', userId)
         .order('session_date', { ascending: false });
 
       if (fetchError) throw fetchError;
@@ -66,14 +75,15 @@ export function useHistory(): UseHistoryReturn {
       console.error('Error fetching session reports:', err);
       setError(err as Error);
     }
-  }, []);
+  }, [supabase, userId]);
 
   const fetchCompReports = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data, error: fetchError } = await supabase
         .from('journal_comp_report')
         .select('*')
-        .eq('user_id', FAKE_USER_ID)
+        .eq('user_id', userId)
         .order('meet_date', { ascending: false });
 
       if (fetchError) throw fetchError;
@@ -82,18 +92,21 @@ export function useHistory(): UseHistoryReturn {
       console.error('Error fetching comp reports:', err);
       setError(err as Error);
     }
-  }, []);
+  }, [supabase, userId]);
 
   const refresh = useCallback(async () => {
+    if (!userId) return;
     setIsLoading(true);
     setError(null);
     await Promise.all([fetchCheckIns(), fetchSessionReports(), fetchCompReports()]);
     setIsLoading(false);
-  }, [fetchCheckIns, fetchSessionReports, fetchCompReports]);
+  }, [fetchCheckIns, fetchSessionReports, fetchCompReports, userId]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (userId) {
+      refresh();
+    }
+  }, [userId]);
 
   return {
     checkIns,
@@ -111,6 +124,14 @@ export function useHistoryDetails(
   type: HistoryFilter,
   id: number
 ): UseHistoryDetailsReturn {
+  const { getToken, userId } = useAuth();
+
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase' });
+    });
+  }, [getToken]);
+
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
   const [session, setSession] = useState<SessionReport | null>(null);
   const [comp, setComp] = useState<CompReport | null>(null);
@@ -119,6 +140,8 @@ export function useHistoryDetails(
 
   useEffect(() => {
     const fetchDetails = async () => {
+      if (!userId || !id) return;
+
       setIsLoading(true);
       setError(null);
 
@@ -160,7 +183,7 @@ export function useHistoryDetails(
     };
 
     fetchDetails();
-  }, [type, id]);
+  }, [type, id, supabase, userId]);
 
   const deleteItem = useCallback(async (): Promise<boolean> => {
     try {
@@ -185,7 +208,7 @@ export function useHistoryDetails(
       setError(err as Error);
       return false;
     }
-  }, [type, id]);
+  }, [type, id, supabase]);
 
   return {
     checkIn,

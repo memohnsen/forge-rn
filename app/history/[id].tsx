@@ -1,5 +1,6 @@
 import { colors } from '@/constants/colors';
-import { HistoryFilter, getAccentColor } from '@/hooks/use-history';
+import { HistoryFilter, useHistoryDetails, getAccentColor } from '@/hooks/use-history';
+import { useHome } from '@/hooks/use-home';
 import { CheckIn } from '@/models/CheckIn';
 import { CompReport } from '@/models/Competition';
 import { SessionReport } from '@/models/Session';
@@ -7,7 +8,7 @@ import { formatDate } from '@/utils/dateFormatter';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -22,241 +23,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Fake data matching the list screen
-const FAKE_CHECK_INS: CheckIn[] = [
-  {
-    id: 1,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-25',
-    selected_lift: 'Squat',
-    selected_intensity: 'Heavy',
-    goal: 'Hit 405 for a triple',
-    physical_strength: 4,
-    mental_strength: 5,
-    recovered: 4,
-    confidence: 5,
-    sleep: 4,
-    energy: 4,
-    stress: 2,
-    soreness: 2,
-    readiness: 5,
-    focus: 5,
-    excitement: 5,
-    body_connection: 4,
-    concerns: '',
-    physical_score: 85,
-    mental_score: 90,
-    overall_score: 88,
-    created_at: '2026-01-25T08:00:00Z',
-  },
-  {
-    id: 2,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-24',
-    selected_lift: 'Bench',
-    selected_intensity: 'Moderate',
-    goal: 'Work on paused reps',
-    physical_strength: 3,
-    mental_strength: 4,
-    recovered: 3,
-    confidence: 4,
-    sleep: 3,
-    energy: 3,
-    stress: 3,
-    soreness: 3,
-    readiness: 3,
-    focus: 4,
-    excitement: 4,
-    body_connection: 3,
-    concerns: 'Shoulder feeling tight',
-    physical_score: 68,
-    mental_score: 75,
-    overall_score: 72,
-    created_at: '2026-01-24T08:00:00Z',
-  },
-  {
-    id: 3,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-22',
-    selected_lift: 'Deadlift',
-    selected_intensity: 'Light',
-    goal: 'Speed work, focus on form',
-    physical_strength: 5,
-    mental_strength: 5,
-    recovered: 5,
-    confidence: 5,
-    sleep: 5,
-    energy: 4,
-    stress: 1,
-    soreness: 1,
-    readiness: 5,
-    focus: 5,
-    excitement: 5,
-    body_connection: 5,
-    concerns: '',
-    physical_score: 95,
-    mental_score: 92,
-    overall_score: 94,
-    created_at: '2026-01-22T08:00:00Z',
-  },
-  {
-    id: 4,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-20',
-    selected_lift: 'Squat',
-    selected_intensity: 'Heavy',
-    goal: 'Work up to a heavy single',
-    physical_strength: 2,
-    mental_strength: 3,
-    recovered: 2,
-    confidence: 3,
-    sleep: 2,
-    energy: 2,
-    stress: 4,
-    soreness: 4,
-    readiness: 2,
-    focus: 3,
-    excitement: 3,
-    body_connection: 2,
-    concerns: 'Feeling beat up from last week',
-    physical_score: 48,
-    mental_score: 58,
-    overall_score: 53,
-    created_at: '2026-01-20T08:00:00Z',
-  },
-];
-
-const FAKE_SESSION_REPORTS: SessionReport[] = [
-  {
-    id: 1,
-    user_id: 'fake-user',
-    session_date: '2026-01-25',
-    time_of_day: 'Late Morning',
-    session_rpe: 2,
-    movement_quality: 4,
-    focus: 5,
-    misses: '0',
-    cues: 'Drive knees out, stay tight',
-    feeling: 4,
-    satisfaction: 5,
-    confidence: 5,
-    what_learned: 'Need to trust my strength more',
-    what_would_change: 'Maybe warm up longer',
-    selected_lift: 'Squat',
-    selected_intensity: 'Heavy',
-    created_at: '2026-01-25T12:00:00Z',
-  },
-  {
-    id: 2,
-    user_id: 'fake-user',
-    session_date: '2026-01-23',
-    time_of_day: 'Afternoon',
-    session_rpe: 3,
-    movement_quality: 3,
-    focus: 4,
-    misses: '1',
-    cues: 'Arch hard, leg drive',
-    feeling: 3,
-    satisfaction: 4,
-    confidence: 4,
-    what_learned: 'Setup is everything',
-    what_would_change: 'Take more rest between sets',
-    selected_lift: 'Bench',
-    selected_intensity: 'Moderate',
-    created_at: '2026-01-23T15:00:00Z',
-  },
-  {
-    id: 3,
-    user_id: 'fake-user',
-    session_date: '2026-01-21',
-    time_of_day: 'Evening',
-    session_rpe: 4,
-    movement_quality: 2,
-    focus: 3,
-    misses: '2',
-    cues: 'Hips through, squeeze glutes',
-    feeling: 2,
-    satisfaction: 2,
-    confidence: 3,
-    what_learned: 'Should have listened to my body',
-    what_would_change: 'Deload when fatigued',
-    selected_lift: 'Deadlift',
-    selected_intensity: 'Heavy',
-    created_at: '2026-01-21T18:00:00Z',
-  },
-];
-
-const FAKE_COMP_REPORTS: CompReport[] = [
-  {
-    id: 1,
-    user_id: 'fake-user',
-    meet: 'USAPL Regionals',
-    selected_meet_type: 'Local',
-    meet_date: '2026-01-15',
-    bodyweight: '82.5',
-    performance_rating: 4,
-    physical_preparedness_rating: 5,
-    mental_preparedness_rating: 4,
-    nutrition: 'Carb loaded properly, felt energized',
-    hydration: 'Good, drank plenty of water',
-    did_well: 'Stayed calm under pressure, hit all openers',
-    needs_work: 'Third attempts were shaky',
-    good_from_training: 'Heavy singles helped confidence',
-    cues: 'Breathe, brace, execute',
-    focus: 'Hitting PRs next meet',
-    satisfaction: 4,
-    confidence: 5,
-    pressure_handling: 4,
-    what_learned: 'I can handle competition pressure',
-    what_proud_of: 'Going 8/9 on attempts',
-    created_at: '2026-01-15T20:00:00Z',
-    squat1: '180',
-    squat2: '190',
-    squat3: '197.5',
-    bench1: '120',
-    bench2: '127.5',
-    bench3: '132.5',
-    deadlift1: '220',
-    deadlift2: '235',
-    deadlift3: '245',
-    squat_best: 198,
-    bench_best: 133,
-    deadlift_best: 245,
-  },
-  {
-    id: 2,
-    user_id: 'fake-user',
-    meet: 'Local Push-Pull',
-    selected_meet_type: 'Local',
-    meet_date: '2025-11-10',
-    bodyweight: '83.2',
-    performance_rating: 3,
-    physical_preparedness_rating: 3,
-    mental_preparedness_rating: 3,
-    nutrition: 'Could have eaten more',
-    hydration: 'Decent',
-    did_well: 'Bench felt strong',
-    needs_work: 'Deadlift lockout',
-    good_from_training: 'Paused work',
-    cues: 'Stay tight',
-    focus: 'Lock in deadlift technique',
-    satisfaction: 3,
-    confidence: 3,
-    pressure_handling: 3,
-    what_learned: 'Need more meet experience',
-    what_proud_of: 'PR on bench',
-    created_at: '2025-11-10T20:00:00Z',
-    bench1: '115',
-    bench2: '125',
-    bench3: '130',
-    deadlift1: '210',
-    deadlift2: '225',
-    deadlift3: '0',
-    bench_best: 130,
-    deadlift_best: 225,
-  },
-];
 
 // Rating color helper
 function getRatingColor(value: number, isInverse: boolean = false): string {
@@ -504,43 +270,40 @@ export default function HistoryDetailsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const userSport = 'Powerlifting'; // Default to powerlifting
-
   // Ensure type has a valid default
   const type: HistoryFilter = (rawType as HistoryFilter) || 'Check-Ins';
+  const numId = parseInt(id || '0');
 
-  // Get the item data based on type and id
+  const { checkIn, session, comp, isLoading, deleteItem } = useHistoryDetails(type, numId);
+  const { user } = useHome();
+
+  const userSport = user?.sport || 'Powerlifting';
+
+  // Get the item data based on type
   const item = useMemo(() => {
-    const numId = parseInt(id || '0');
-    if (type === 'Check-Ins') {
-      return FAKE_CHECK_INS.find((c) => c.id === numId);
-    } else if (type === 'Workouts') {
-      return FAKE_SESSION_REPORTS.find((s) => s.id === numId);
-    } else if (type === 'Meets') {
-      return FAKE_COMP_REPORTS.find((c) => c.id === numId);
-    }
+    if (type === 'Check-Ins') return checkIn;
+    if (type === 'Workouts') return session;
+    if (type === 'Meets') return comp;
     return null;
-  }, [id, type]);
+  }, [type, checkIn, session, comp]);
 
   const pageTitle = useMemo(() => {
     if (!item) return 'Loading...';
     if (type === 'Meets') {
       return (item as CompReport).meet;
     } else if (type === 'Workouts') {
-      const session = item as SessionReport;
-      return `${session.selected_intensity} ${session.selected_lift}`;
+      const s = item as SessionReport;
+      return `${s.selected_intensity} ${s.selected_lift}`;
     } else {
-      const checkIn = item as CheckIn;
-      return `${checkIn.selected_intensity} ${checkIn.selected_lift}`;
+      const c = item as CheckIn;
+      return `${c.selected_intensity} ${c.selected_lift}`;
     }
   }, [item, type]);
 
   const handleShare = async () => {
     let shareText = '';
 
-    if (type === 'Check-Ins' && item) {
-      const checkIn = item as CheckIn;
+    if (type === 'Check-Ins' && checkIn) {
       shareText = `Check-In Results for ${formatDate(checkIn.check_in_date)}
 
 Overall Readiness: ${checkIn.overall_score}%
@@ -550,8 +313,7 @@ Mental Readiness: ${checkIn.mental_score}%
 Daily Goal: ${checkIn.goal}
 
 Powered By Forge - Performance Journal`;
-    } else if (type === 'Workouts' && item) {
-      const session = item as SessionReport;
+    } else if (type === 'Workouts' && session) {
       shareText = `Session Results for ${formatDate(session.session_date)}
 Session Focus: ${session.selected_intensity} ${session.selected_lift}
 
@@ -560,8 +322,7 @@ Movement Quality: ${session.movement_quality}/5
 Focus: ${session.focus}/5
 
 Powered By Forge - Performance Journal`;
-    } else if (type === 'Meets' && item) {
-      const comp = item as CompReport;
+    } else if (type === 'Meets' && comp) {
       const total = (comp.squat_best || 0) + (comp.bench_best || 0) + (comp.deadlift_best || 0);
       shareText = `Meet Results for ${comp.meet} - ${formatDate(comp.meet_date)}
 
@@ -580,10 +341,11 @@ Powered By Forge - Performance Journal`;
   };
 
   const handleDelete = () => {
-    const confirmDelete = () => {
-      // In real app, this would call the delete function
-      console.log('Deleting item:', id);
-      router.back();
+    const confirmDelete = async () => {
+      const success = await deleteItem();
+      if (success) {
+        router.back();
+      }
     };
 
     if (Platform.OS === 'ios') {
@@ -878,6 +640,28 @@ Powered By Forge - Performance Journal`;
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
+          </Pressable>
+          <Text
+            style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}
+            numberOfLines={1}
+          >
+            Loading...
+          </Text>
+          <View style={styles.menuButton} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.blueEnergy} />
+        </View>
+      </View>
+    );
+  }
+
   if (!item) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
@@ -922,9 +706,9 @@ Powered By Forge - Performance Journal`;
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {type === 'Check-Ins' && renderCheckInContent(item as CheckIn)}
-        {type === 'Workouts' && renderSessionContent(item as SessionReport)}
-        {type === 'Meets' && renderCompContent(item as CompReport)}
+        {type === 'Check-Ins' && checkIn && renderCheckInContent(checkIn)}
+        {type === 'Workouts' && session && renderSessionContent(session)}
+        {type === 'Meets' && comp && renderCompContent(comp)}
       </ScrollView>
     </View>
   );

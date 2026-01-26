@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/colors';
+
+export const useWarmUpBrowser = () => {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
+};
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,13 +33,18 @@ export default function SignInScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
 
+  useWarmUpBrowser();
+
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
 
   const handleGoogleSignIn = useCallback(async () => {
     try {
+      const redirectUrl = Linking.createURL('sso-callback');
+
       const { createdSessionId, setActive } = await startGoogleSSO({
         strategy: 'oauth_google',
+        redirectUrl,
       });
 
       if (createdSessionId && setActive) {
@@ -43,8 +58,11 @@ export default function SignInScreen() {
 
   const handleAppleSignIn = useCallback(async () => {
     try {
+      const redirectUrl = Linking.createURL('sso-callback');
+
       const { createdSessionId, setActive } = await startAppleSSO({
         strategy: 'oauth_apple',
+        redirectUrl,
       });
 
       if (createdSessionId && setActive) {

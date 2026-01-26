@@ -2,12 +2,13 @@ import { DailyCheckInSection } from '@/components/sections/DailyCheckInSection';
 import { HistorySection } from '@/components/sections/HistorySection';
 import { MeetCountdownCard } from '@/components/sections/MeetCountdownCard';
 import { ReflectionSection } from '@/components/sections/ReflectionSection';
-import { CheckIn } from '@/models/CheckIn';
+import { useHome } from '@/hooks/use-home';
 import { formatDate, formatToISO } from '@/utils/dateFormatter';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -25,144 +26,72 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Check for iOS 26+ (iOS 26 = version 26.0)
 const isIOS26OrLater = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 26;
 
-// Fake data for UI development
-const FAKE_USER = {
-  first_name: 'Maddisen',
-  last_name: 'Mohnsen',
-  next_competition: 'USAPL Nationals',
-  next_competition_date: '2026-03-15',
-  training_days: {
-    Monday: 'Squat',
-    Wednesday: 'Bench',
-    Friday: 'Deadlift',
-    Saturday: 'Accessories',
-  },
-};
-
-const FAKE_CHECK_INS: CheckIn[] = [
-  {
-    id: 1,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-25',
-    selected_lift: 'Squat',
-    selected_intensity: 'Heavy',
-    overall_score: 85,
-    sleep_quality: 8,
-    stress_level: 3,
-    energy_level: 7,
-    soreness_level: 4,
-    motivation_level: 9,
-  },
-  {
-    id: 2,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-24',
-    selected_lift: 'Bench',
-    selected_intensity: 'Moderate',
-    overall_score: 72,
-    sleep_quality: 6,
-    stress_level: 5,
-    energy_level: 6,
-    soreness_level: 5,
-    motivation_level: 7,
-  },
-  {
-    id: 3,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-22',
-    selected_lift: 'Deadlift',
-    selected_intensity: 'Light',
-    overall_score: 91,
-    sleep_quality: 9,
-    stress_level: 2,
-    energy_level: 8,
-    soreness_level: 3,
-    motivation_level: 9,
-  },
-  {
-    id: 4,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-20',
-    selected_lift: 'Squat',
-    selected_intensity: 'Heavy',
-    overall_score: 58,
-    sleep_quality: 5,
-    stress_level: 7,
-    energy_level: 4,
-    soreness_level: 6,
-    motivation_level: 5,
-  },
-  {
-    id: 5,
-    user_id: 'fake-user',
-    check_in_date: '2026-01-18',
-    selected_lift: 'Accessories',
-    selected_intensity: 'Moderate',
-    overall_score: 78,
-    sleep_quality: 7,
-    stress_level: 4,
-    energy_level: 7,
-    soreness_level: 4,
-    motivation_level: 8,
-  },
-];
-
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
 
+  const { userId } = useAuth();
+  const { user: clerkUser } = useUser();
+
+  const {
+    user,
+    checkIns,
+    loadingHistory,
+    streakDisplayText,
+    streakLabelText,
+    streakStatusText,
+    streakColor,
+    streakIconName,
+    daysUntilMeet,
+    meetNameDisplay,
+    daysUntilMeetText,
+    sessionsLeftText,
+    fetchUsers,
+    fetchCheckIns,
+    fetchSessionReports,
+    calculateStreak,
+    updateUserMeet,
+    refreshData,
+  } = useHome();
+
   const [refreshing, setRefreshing] = useState(false);
   const [editMeetSheetShown, setEditMeetSheetShown] = useState(false);
-  const [newMeetName, setNewMeetName] = useState(FAKE_USER.next_competition);
-  const [newMeetDate, setNewMeetDate] = useState(new Date(FAKE_USER.next_competition_date));
+  const [newMeetName, setNewMeetName] = useState('');
+  const [newMeetDate, setNewMeetDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Computed values from fake data
-  const daysUntilMeet = (() => {
-    const meetDate = new Date(FAKE_USER.next_competition_date);
-    const today = new Date();
-    const diffTime = meetDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  })();
+  // Fetch data on mount
+  useEffect(() => {
+    if (userId) {
+      fetchUsers(userId);
+      fetchCheckIns(userId);
+      fetchSessionReports(userId);
+    }
+  }, [userId]);
 
-  const sessionsLeft = (() => {
-    const trainingDaysPerWeek = Object.keys(FAKE_USER.training_days).length;
-    const weeksRemaining = Math.max(0, daysUntilMeet / 7);
-    return Math.ceil(weeksRemaining * trainingDaysPerWeek);
-  })();
-
-  const daysUntilMeetText =
-    daysUntilMeet < 0
-      ? 'Completed'
-      : daysUntilMeet === 0
-        ? 'Today!'
-        : `${daysUntilMeet} day${daysUntilMeet === 1 ? '' : 's'} left`;
-
-  const sessionsLeftText =
-    daysUntilMeet <= 0 ? '0' : `${sessionsLeft} session${sessionsLeft === 1 ? '' : 's'} left`;
-
-  // Fake streak data
-  const streakDisplayText = '12';
-  const streakLabelText = 'day streak!';
-  const streakStatusText = "You're on fire!";
-  const streakColor = '#FF9500';
-  const streakIconName = 'flame';
+  // Calculate streak when data changes
+  useEffect(() => {
+    calculateStreak();
+  }, [checkIns, user]);
 
   const handleRefresh = async () => {
+    if (!userId) return;
     setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await refreshData(userId);
     setRefreshing(false);
   };
 
   const handleEditMeet = () => {
-    setNewMeetName(FAKE_USER.next_competition);
-    setNewMeetDate(new Date(FAKE_USER.next_competition_date));
+    setNewMeetName(user?.next_competition || '');
+    setNewMeetDate(user?.next_competition_date ? new Date(user.next_competition_date) : new Date());
     setEditMeetSheetShown(true);
   };
 
   const handleSaveMeet = async () => {
-    console.log('Saving meet:', { name: newMeetName, date: formatToISO(newMeetDate) });
+    if (!userId) return;
+    await updateUserMeet(userId, newMeetName, formatToISO(newMeetDate));
+    await fetchUsers(userId);
     setEditMeetSheetShown(false);
   };
 
@@ -175,13 +104,14 @@ export default function HomeScreen() {
   });
 
   const headerHeight = 80 + insets.top;
+  const firstName = user?.first_name || clerkUser?.firstName || 'Athlete';
 
   const HeaderContent = () => (
     <View style={[styles.headerContent, { paddingTop: insets.top }]}>
       <View style={styles.headerLeft}>
         <Text style={styles.dateText}>{formattedToday}</Text>
         <Text style={[styles.greetingText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-          Ready to train, {FAKE_USER.first_name}?
+          Ready to train, {firstName}?
         </Text>
       </View>
     </View>
@@ -202,10 +132,10 @@ export default function HomeScreen() {
         }
       >
         <MeetCountdownCard
-          meetName={FAKE_USER.next_competition}
+          meetName={meetNameDisplay}
           daysUntilMeet={daysUntilMeet}
           daysUntilMeetText={daysUntilMeetText}
-          meetDate={formatDate(FAKE_USER.next_competition_date) || 'N/A'}
+          meetDate={user?.next_competition_date ? formatDate(user.next_competition_date) || 'N/A' : 'N/A'}
           sessionsLeftText={sessionsLeftText}
           onPress={handleEditMeet}
         />
@@ -220,7 +150,7 @@ export default function HomeScreen() {
 
         <ReflectionSection />
 
-        <HistorySection checkIns={FAKE_CHECK_INS} isLoading={false} />
+        <HistorySection checkIns={checkIns} isLoading={loadingHistory} />
       </ScrollView>
 
       {/* Glass/Blur Header Overlay */}
