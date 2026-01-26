@@ -1,98 +1,142 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useUser } from '@clerk/clerk-expo';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Screen } from '@/components/layout/Screen';
+import { useTheme } from '@/hooks/use-theme';
+import { useHome } from '@/hooks/use-home';
+import { MeetCountdownCard } from '@/components/sections/MeetCountdownCard';
+import { DailyCheckInSection } from '@/components/sections/DailyCheckInSection';
+import { ReflectionSection } from '@/components/sections/ReflectionSection';
+import { HistorySection } from '@/components/sections/HistorySection';
+import { formatDateString, formatFullDate } from '@/utils/dateFormatter';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const theme = useTheme();
+  const { user } = useUser();
+  const [refreshing, setRefreshing] = useState(false);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const {
+    users,
+    checkIns,
+    loadingHistory,
+    fetchUsers,
+    fetchCheckIns,
+    fetchSessionReports,
+    refreshStreak,
+    meetNameDisplay,
+    daysUntilMeet,
+    daysUntilMeetText,
+    sessionsLeftText,
+    streakDisplayText,
+    streakLabelText,
+    streakStatusText,
+    streakColor,
+    streakIconName,
+  } = useHome();
+
+  useEffect(() => {
+    const load = async () => {
+      await fetchUsers();
+      await fetchCheckIns();
+      await fetchSessionReports();
+      refreshStreak();
+    };
+    void load();
+  }, [fetchUsers, fetchCheckIns, fetchSessionReports, refreshStreak]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCheckIns();
+    await fetchSessionReports();
+    refreshStreak();
+    setRefreshing(false);
+  };
+
+  const meetDate = useMemo(() => users[0]?.next_competition_date ?? '', [users]);
+  const formattedDate = meetDate ? formatDateString(meetDate) : 'N/A';
+
+  return (
+    <Screen>
+      <View style={[styles.header, { backgroundColor: theme.glassTint }]}>
+        <View style={styles.headerText}>
+          <Text style={[styles.headerDate, { color: theme.textSecondary }]}>
+            {formatFullDate(new Date())}
+          </Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Ready to train, {users[0]?.first_name ?? user?.firstName ?? 'athlete'}?
+          </Text>
+        </View>
+        <View style={[styles.avatar, { backgroundColor: theme.backgroundAlt }]}> 
+          <Ionicons name="person" size={20} color={theme.text} />
+        </View>
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <MeetCountdownCard
+          meetName={meetNameDisplay}
+          daysUntilMeet={daysUntilMeet}
+          daysUntilMeetText={daysUntilMeetText}
+          meetDate={formattedDate}
+          sessionsLeftText={sessionsLeftText}
+        />
+        <DailyCheckInSection
+          streakCount={streakDisplayText}
+          streakLabel={streakLabelText}
+          streakStatus={streakStatusText}
+          streakColor={streakColor}
+          streakIcon={streakIconName as keyof typeof Ionicons.glyphMap}
+        />
+        <ReflectionSection />
+        <HistorySection checkins={checkIns} loading={loadingHistory} />
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    shadowColor: 'rgba(0,0,0,0.6)',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  headerText: {
+    flex: 1,
+    gap: 4,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  headerDate: {
+    fontSize: 14,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  scroll: {
+    paddingTop: 10,
+    paddingBottom: 120,
   },
 });
