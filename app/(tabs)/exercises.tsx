@@ -97,6 +97,8 @@ export default function ExercisesScreen() {
       router.push('/exercises/box-breathing');
     } else if (exercise.route === '/exercises/objective-review') {
       router.push('/exercises/objective-review');
+    } else if (exercise.route === '/exercises/external-anchor') {
+      router.push('/exercises/external-anchor');
     } else {
       Alert.alert('Coming soon', `${exercise.title} is coming next.`);
     }
