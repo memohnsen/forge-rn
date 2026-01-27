@@ -250,6 +250,31 @@ export const useHome = () => {
     [supabase]
   );
 
+  const updateCoachEmail = useCallback(
+    async (userId: string, email: string | null) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const { error } = await supabase
+          .from('journal_users')
+          .update({
+            coach_email: email,
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error('Error updating coach email:', err);
+        setError(err as Error);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
   const calculateStreak = useCallback(() => {
     const trainingDays = user?.training_days || {};
     const data = streakManager.calculateStreak(checkIns, sessionReports, trainingDays);
@@ -294,6 +319,7 @@ export const useHome = () => {
     fetchSessionReports,
     submitUserProfile,
     updateUserMeet,
+    updateCoachEmail,
     calculateStreak,
     refreshData,
   };

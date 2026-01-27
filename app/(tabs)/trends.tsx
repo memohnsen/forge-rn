@@ -31,7 +31,6 @@ export default function TrendsScreen() {
   const [selectedCharts, setSelectedCharts] = useState<Set<string>>(DEFAULT_SELECTED);
   const [showTimeFrameSheet, setShowTimeFrameSheet] = useState(false);
   const [showChartSelection, setShowChartSelection] = useState(false);
-  const [showAIResults, setShowAIResults] = useState(false);
 
   const isOuraConnected = useMemo(() => {
     const oura = categories.find((category) => category.id === 'Oura');
@@ -71,6 +70,7 @@ export default function TrendsScreen() {
     if (!category) return false;
     return category.charts.some((chart) => selectedCharts.has(chart.id));
   };
+
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
@@ -136,7 +136,7 @@ export default function TrendsScreen() {
           })}
         </ScrollView>
 
-        <Pressable onPress={() => setShowAIResults(true)} style={styles.aiCardWrapper}>
+        <Pressable onPress={() => router.push('/trends/ai')} style={styles.aiCardWrapper}>
           <View
             style={[
               styles.aiCard,
@@ -209,11 +209,6 @@ export default function TrendsScreen() {
         isDark={isDark}
       />
 
-      <AIResultsSheet
-        visible={showAIResults}
-        onClose={() => setShowAIResults(false)}
-        isDark={isDark}
-      />
     </View>
   );
 }
@@ -404,52 +399,6 @@ function ChartSelectionSheet({
   );
 }
 
-function AIResultsSheet({
-  visible,
-  onClose,
-  isDark,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  isDark: boolean;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.aiSheetCard, { backgroundColor: isDark ? '#0F0F0F' : '#FFFFFF' }]}
-          onPress={(event) => event.stopPropagation()}
-        >
-          <View style={styles.sheetHeaderRow}>
-            <View style={styles.aiHeader}>
-              <MaterialCommunityIcons name="star-four-points" size={20} color="#8C64C8" />
-              <Text style={[styles.sheetTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-                AI Trend Analysis
-              </Text>
-            </View>
-            <Pressable onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-            </Pressable>
-          </View>
-          <View style={styles.aiContent}>
-            <Text style={styles.aiParagraph}>
-              * Training consistency improved over the last two weeks, with higher readiness scores
-              following sessions rated as moderate intensity.
-            </Text>
-            <Text style={styles.aiParagraph}>
-              * Recovery trends look strongest on days after higher sleep duration, especially when
-              sleep stays above 7.5 hours.
-            </Text>
-            <Text style={styles.aiParagraph}>
-              * Confidence and performance ratings are climbing steadily, suggesting the current
-              training block is building momentum.
-            </Text>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
 
 function Sparkline({
   data,
@@ -774,26 +723,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  aiSheetCard: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-  },
-  aiHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aiContent: {
-    backgroundColor: '#8C64C812',
-    borderRadius: 18,
-    padding: 16,
-    gap: 14,
-  },
-  aiParagraph: {
-    fontSize: 14,
-    color: '#999',
-    lineHeight: 20,
   },
 });

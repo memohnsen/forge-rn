@@ -1,7 +1,11 @@
 import { colors } from '@/constants/colors';
+import { CoachEmailSheet } from '@/components/CoachEmailSheet';
+import { useHome } from '@/hooks/use-home';
+import { createAndShareCSV } from '@/utils/csvExport';
+import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -18,13 +22,37 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const { userId, getToken } = useAuth();
+  const { user, fetchUsers, updateCoachEmail } = useHome();
+
   const [isExporting, setIsExporting] = useState(false);
+  const [showCoachEmailSheet, setShowCoachEmailSheet] = useState(false);
 
   const handleExport = async () => {
+    if (!userId) {
+      Alert.alert('Error', 'Unable to export data. Please try again.');
+      return;
+    }
+
     setIsExporting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setIsExporting(false);
-    Alert.alert('Export Ready', 'Your CSV export has been prepared.');
+
+    try {
+      const success = await createAndShareCSV({
+        userId,
+        getToken: async () => getToken({ template: 'supabase', skipCache: true })
+      });
+
+      if (success) {
+        // Share sheet will handle the export, no alert needed
+      } else {
+        Alert.alert('Export Failed', 'Unable to export your data. Please try again.');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Export Failed', 'An error occurred while exporting your data.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleDelete = () => {
@@ -33,6 +61,29 @@ export default function SettingsScreen() {
       { text: 'Delete', style: 'destructive', onPress: () => {} },
     ]);
   };
+
+  const handleSaveCoachEmail = async (email: string) => {
+    if (!userId) return;
+
+    const success = await updateCoachEmail(userId, email || null);
+
+    if (success) {
+      await fetchUsers(userId);
+      setShowCoachEmailSheet(false);
+      Alert.alert(
+        'Coach Email Saved',
+        'Your coach email has been saved. Weekly reports will be sent automatically every Sunday.'
+      );
+    } else {
+      Alert.alert('Error', 'Failed to save coach email. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchUsers(userId);
+    }
+  }, [userId]);
 
   return (
     <View
@@ -73,7 +124,7 @@ export default function SettingsScreen() {
             title="Auto-Send Results"
             accentColor="#8C64C8"
             isDark={isDark}
-            onPress={() => Alert.alert('Coming soon', 'Auto-send setup is next.')}
+            onPress={() => setShowCoachEmailSheet(true)}
           />
           <SettingsRow
             icon="help-circle"
@@ -127,6 +178,13 @@ export default function SettingsScreen() {
           <Text style={styles.versionText}>Forge Version 1.0.0</Text>
         </View>
       </ScrollView>
+
+      <CoachEmailSheet
+        visible={showCoachEmailSheet}
+        initialEmail={user?.coach_email || ''}
+        onSave={handleSaveCoachEmail}
+        onCancel={() => setShowCoachEmailSheet(false)}
+      />
     </View>
   );
 }

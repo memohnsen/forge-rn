@@ -184,5 +184,8 @@ export function useTrends() {
     isLoading,
     error,
     refresh,
+    checkIns,
+    sessionReports,
+    compReports,
   };
 }

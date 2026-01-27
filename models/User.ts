@@ -15,9 +15,9 @@ export interface User {
   biggest_frustration: string;
   reflection_frequency: string;
   what_holding_back: string;
-  coach_email?: string;
-  oura_refresh_token?: string;
-  whoop_refresh_token?: string;
+  coach_email?: string | null;
+  oura_refresh_token?: string | null;
+  whoop_refresh_token?: string | null;
   store_token?: boolean;
   created_at?: string;
 }

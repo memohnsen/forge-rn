@@ -287,6 +287,7 @@ export default function HomeScreen() {
             )}
             {Platform.OS === 'ios' && (
               <DateTimePicker
+               style={{ marginLeft: 8 }}
                 value={newMeetDate}
                 mode="date"
                 display="default"

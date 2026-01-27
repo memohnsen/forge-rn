@@ -50,9 +50,11 @@ app-example
 .env.production.local
 
 bun.lockb
-bun.lock
+/bun.lock
 package-lock.json
 
 
 .claude/
+
+.plans/
 .vscode/
