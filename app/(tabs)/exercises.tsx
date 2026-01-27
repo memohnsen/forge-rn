@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef } from 'react';
 import {
   Alert,
@@ -92,8 +93,11 @@ export default function ExercisesScreen() {
   );
 
   const handlePress = (exercise: ExerciseCard) => {
-    Alert.alert('Coming soon', 'This exercise screen is next up.');
-    console.log('Planned route:', exercise.route);
+    if (exercise.route === '/exercises/box-breathing') {
+      router.push('/exercises/box-breathing');
+    } else {
+      Alert.alert('Coming soon', `${exercise.title} is coming next.`);
+    }
   };
 
   return (

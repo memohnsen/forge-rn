@@ -1,8 +1,8 @@
+import { colors } from '@/constants/colors';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
 import { Platform } from 'react-native';
-import { colors } from '@/constants/colors';
 
 export default function TabLayout() {
   if (Platform.OS === 'android') {

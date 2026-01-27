@@ -1,5 +1,5 @@
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
 
@@ -45,7 +45,18 @@ function InitialLayout() {
     }
   }, [isLoaded, isSignedIn, segments]);
 
-  return <Slot />;
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="check-in" options={{ presentation: 'card' }} />
+      <Stack.Screen name="workout" options={{ presentation: 'card' }} />
+      <Stack.Screen name="competition" options={{ presentation: 'card' }} />
+      <Stack.Screen name="history" options={{ presentation: 'card' }} />
+      <Stack.Screen name="trends" options={{ presentation: 'card' }} />
+      <Stack.Screen name="exercises" options={{ presentation: 'card' }} />
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
