@@ -69,7 +69,18 @@ export default function TrendsAIPage() {
     void runAiAnalysis();
   }, [runAiAnalysis]);
 
-  const formattedResponse = aiResponse.replace(/\*/g, '\n').trim();
+  const formattedLines = useMemo(() => {
+    return aiResponse
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+  }, [aiResponse]);
+
+  const handleRefresh = useCallback(() => {
+    lastPromptRef.current = null;
+    setAiResponse('');
+    void runAiAnalysis();
+  }, [runAiAnalysis]);
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
@@ -84,7 +95,13 @@ export default function TrendsAIPage() {
         <Text style={[styles.pageTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
           AI Trend Analysis
         </Text>
-        <View style={styles.headerSpacer} />
+        {aiResponse && !isAiLoading ? (
+          <Pressable onPress={handleRefresh} style={styles.refreshButton}>
+            <MaterialCommunityIcons name="refresh" size={20} color="#8C64C8" />
+          </Pressable>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 }]}>
@@ -110,7 +127,16 @@ export default function TrendsAIPage() {
           </View>
         ) : (
           <View style={styles.aiContent}>
-            <Text style={styles.aiParagraph}>{formattedResponse}</Text>
+            {formattedLines.map((line, index) => {
+              const isBullet = line.startsWith('*');
+              const text = isBullet ? line.substring(1).trim() : line;
+              return (
+                <View key={index} style={isBullet ? styles.bulletPoint : styles.paragraph}>
+                  {isBullet && <Text style={styles.bulletDot}>•</Text>}
+                  <Text style={[styles.aiText, { color: isDark ? '#CCC' : '#666' }]}>{text}</Text>
+                </View>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -169,11 +195,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#8C64C812',
     borderRadius: 20,
     padding: 18,
+    gap: 12,
   },
-  aiParagraph: {
+  paragraph: {
+    marginBottom: 8,
+  },
+  bulletPoint: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  bulletDot: {
     fontSize: 14,
-    color: '#999',
+    color: '#8C64C8',
+    fontWeight: '700',
+  },
+  aiText: {
+    flex: 1,
+    fontSize: 14,
     lineHeight: 20,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8C64C822',
   },
   aiLoading: {
     alignItems: 'center',

@@ -5,6 +5,7 @@ export const colors = {
   paleSlate: '#ABA8B2',
   silver: '#C3C3C3',
   gold: '#FFBF00',
+  orange: '#FF6600',
 
   // Check-in colors
   checkInOrange: '#FFA050',
