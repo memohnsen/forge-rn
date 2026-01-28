@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
+import { formatToISO } from '@/utils/dateFormatter';
 
 // MARK: - Types
 
@@ -326,10 +327,10 @@ export const fetchOuraSleep = async (
 
   const params = new URLSearchParams();
   if (startDate) {
-    params.append('start_date', startDate.toISOString().split('T')[0]);
+    params.append('start_date', formatToISO(startDate));
   }
   if (endDate) {
-    params.append('end_date', endDate.toISOString().split('T')[0]);
+    params.append('end_date', formatToISO(endDate));
   }
 
   const url = `https://api.ouraring.com/v2/usercollection/sleep${params.toString() ? `?${params.toString()}` : ''}`;
