@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Purchases from 'react-native-purchases';
+import RevenueCatUI from 'react-native-purchases-ui';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -65,7 +66,7 @@ export default function SettingsScreen() {
 
   const handleCustomerSupport = async () => {
     try {
-      await Purchases.presentCustomerCenter();
+      await RevenueCatUI.presentCustomerCenter();
     } catch (error) {
       console.error('Error presenting Customer Center:', error);
       Alert.alert('Error', 'Unable to open Customer Support. Please try again later.');

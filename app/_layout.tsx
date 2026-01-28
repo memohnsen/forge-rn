@@ -1,7 +1,7 @@
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Purchases from 'react-native-purchases';
 
 const tokenCache = {
@@ -31,18 +31,26 @@ function InitialLayout() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [isRevenueCatConfigured, setIsRevenueCatConfigured] = useState(false);
 
   // Initialize RevenueCat
   useEffect(() => {
-    const revenuecatKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+    const revenuecatKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
     if (revenuecatKey) {
-      Purchases.configure({ apiKey: revenuecatKey });
+      try {
+        Purchases.configure({ apiKey: revenuecatKey });
+        setIsRevenueCatConfigured(true);
+      } catch (error) {
+        console.error('Error configuring RevenueCat:', error);
+      }
+    } else {
+      console.warn('Missing EXPO_PUBLIC_REVENUECAT_KEY; skipping RevenueCat configuration.');
     }
   }, []);
 
   // Login user to RevenueCat when authenticated
   useEffect(() => {
-    if (userId) {
+    if (userId && isRevenueCatConfigured) {
       Purchases.logIn(userId)
         .then(({ customerInfo, created }) => {
           console.log('Logged in to RevenueCat with user ID:', userId);
@@ -52,7 +60,7 @@ function InitialLayout() {
           console.error('Error logging in to RevenueCat:', error);
         });
     }
-  }, [userId]);
+  }, [userId, isRevenueCatConfigured]);
 
   useEffect(() => {
     if (!isLoaded) return;
