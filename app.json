@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.memohnsen.forge"
     },
     "android": {
       "adaptiveIcon": {
@@ -44,6 +45,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "21a35af4-b604-4bcd-a950-0f035cc4a67e"
+      }
+    },
+    "owner": "memohnsen"
   }
 }

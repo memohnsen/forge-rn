@@ -2,6 +2,7 @@ import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
+import { useRevenueCat } from '@/hooks/use-revenuecat';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -30,6 +31,7 @@ function InitialLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  useRevenueCat();
 
   useEffect(() => {
     if (!isLoaded) return;
