@@ -156,6 +156,8 @@ export function useWearableConnectionStatus() {
 
   const checkStatus = useCallback(async () => {
     if (!userId) {
+      setOuraConnected(false);
+      setWhoopConnected(false);
       setIsLoading(false);
       return;
     }
@@ -179,6 +181,8 @@ export function useWearableConnectionStatus() {
       setWhoopConnected(whoop);
     } catch (error) {
       console.error('[useWearableConnectionStatus] Error:', error);
+      setOuraConnected(false);
+      setWhoopConnected(false);
     } finally {
       setIsLoading(false);
     }

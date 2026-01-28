@@ -267,8 +267,8 @@ export const authenticateWhoop = async (
 
     // Verify state parameter (CSRF protection)
     const receivedState = url.queryParams?.state as string | undefined;
-    if (currentAuthState && receivedState !== currentAuthState) {
-      throw new Error('State mismatch - potential CSRF attack');
+    if (!currentAuthState || receivedState !== currentAuthState) {
+      throw new Error('State missing or mismatch - potential CSRF attack');
     }
 
     const code = url.queryParams?.code as string | undefined;
