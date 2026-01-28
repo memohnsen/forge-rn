@@ -5,10 +5,12 @@ import { createAndShareCSV } from '@/utils/csvExport';
 import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { userId, getToken } = useAuth();
   const { user, fetchUsers, updateCoachEmail } = useHome();
 
@@ -118,7 +121,7 @@ export default function SettingsScreen() {
             title="Connected Apps"
             accentColor="#5AB48C"
             isDark={isDark}
-            onPress={() => Alert.alert('Coming soon', 'Connected apps are next.')}
+            onPress={() => router.push('/settings/connected-apps')}
           />
           <SettingsRow
             icon="upload"
