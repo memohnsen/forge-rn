@@ -5,6 +5,8 @@ import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { CompReport } from '@/models/Competition';
 import { CATEGORIES, type ChartCategory, type TrendPoint } from '@/utils/trends-data';
+import { fetchOuraDailyData, isOuraConnected, type OuraDailyData } from '@/services/oura';
+import { fetchWhoopDailyData, isWhoopConnected, type WhoopDailyData } from '@/services/whoop';
 
 const parseDate = (value: string) => {
   const date = new Date(value);
@@ -70,6 +72,8 @@ export function useTrends() {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
   const [compReports, setCompReports] = useState<CompReport[]>([]);
+  const [ouraData, setOuraData] = useState<OuraDailyData[]>([]);
+  const [whoopData, setWhoopData] = useState<WhoopDailyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -85,6 +89,7 @@ export function useTrends() {
     isRefreshingRef.current = true;
 
     try {
+      // Fetch Supabase data
       const [checkInsResponse, sessionsResponse, compsResponse] = await Promise.all([
         supabase
           .from('journal_daily_checkins')
@@ -110,6 +115,43 @@ export function useTrends() {
       setCheckIns(checkInsResponse.data || []);
       setSessionReports(sessionsResponse.data || []);
       setCompReports(compsResponse.data || []);
+
+      // Fetch wearable data if connected (last 90 days)
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const [ouraConnected, whoopConnected] = await Promise.all([
+        isOuraConnected(userId),
+        isWhoopConnected(userId),
+      ]);
+
+      // Fetch Oura data if connected
+      if (ouraConnected) {
+        try {
+          const ouraResult = await fetchOuraDailyData(userId, ninetyDaysAgo);
+          setOuraData(ouraResult);
+          console.log(`[useTrends] Fetched ${ouraResult.length} Oura records`);
+        } catch (ouraError) {
+          console.warn('[useTrends] Failed to fetch Oura data:', ouraError);
+          setOuraData([]);
+        }
+      } else {
+        setOuraData([]);
+      }
+
+      // Fetch Whoop data if connected
+      if (whoopConnected) {
+        try {
+          const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo);
+          setWhoopData(whoopResult);
+          console.log(`[useTrends] Fetched ${whoopResult.length} Whoop records`);
+        } catch (whoopError) {
+          console.warn('[useTrends] Failed to fetch Whoop data:', whoopError);
+          setWhoopData([]);
+        }
+      } else {
+        setWhoopData([]);
+      }
     } catch (err) {
       const error =
         err instanceof Error
@@ -131,6 +173,7 @@ export function useTrends() {
 
   const dataByChartId = useMemo<Record<string, TrendPoint[]>>(() => {
     return {
+      // Check-in charts
       checkin_overall: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.overall_score),
       checkin_physical: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.physical_score),
       checkin_mental: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.mental_score),
@@ -146,6 +189,7 @@ export function useTrends() {
       checkin_focus: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.focus),
       checkin_excitement: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.excitement),
       checkin_body_connection: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.body_connection),
+      // Workout charts
       workout_rpe: buildSeries(sessionReports, (item) => item.session_date, (item) => item.session_rpe),
       workout_quality: buildSeries(sessionReports, (item) => item.session_date, (item) => item.movement_quality),
       workout_focus: buildSeries(sessionReports, (item) => item.session_date, (item) => item.focus),
@@ -153,6 +197,7 @@ export function useTrends() {
       workout_feeling: buildSeries(sessionReports, (item) => item.session_date, (item) => item.feeling),
       workout_satisfaction: buildSeries(sessionReports, (item) => item.session_date, (item) => item.satisfaction),
       workout_confidence: buildSeries(sessionReports, (item) => item.session_date, (item) => item.confidence),
+      // Meet charts
       meet_performance: buildSeries(compReports, (item) => item.meet_date, (item) => item.performance_rating),
       meet_physical_prep: buildSeries(compReports, (item) => item.meet_date, (item) => item.physical_preparedness_rating),
       meet_mental_prep: buildSeries(compReports, (item) => item.meet_date, (item) => item.mental_preparedness_rating),
@@ -166,8 +211,60 @@ export function useTrends() {
       meet_squat_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.squat_best)),
       meet_bench_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.bench_best)),
       meet_deadlift_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.deadlift_best)),
+      // Oura charts
+      oura_sleep: buildSeries(
+        ouraData.filter((item) => item.sleepDurationHours !== undefined),
+        (item) => item.date,
+        (item) => item.sleepDurationHours ?? 0
+      ),
+      oura_hrv: buildSeries(
+        ouraData.filter((item) => item.hrv !== undefined),
+        (item) => item.date,
+        (item) => item.hrv ?? 0
+      ),
+      oura_heart_rate: buildSeries(
+        ouraData.filter((item) => item.averageHeartRate !== undefined),
+        (item) => item.date,
+        (item) => item.averageHeartRate ?? 0
+      ),
+      oura_readiness: buildSeries(
+        ouraData.filter((item) => item.readinessScore !== undefined),
+        (item) => item.date,
+        (item) => item.readinessScore ?? 0
+      ),
+      // Whoop charts
+      whoop_recovery: buildSeries(
+        whoopData.filter((item) => item.recoveryScore !== undefined),
+        (item) => item.date,
+        (item) => item.recoveryScore ?? 0
+      ),
+      whoop_sleep: buildSeries(
+        whoopData.filter((item) => item.sleepDurationHours !== undefined),
+        (item) => item.date,
+        (item) => item.sleepDurationHours ?? 0
+      ),
+      whoop_sleep_performance: buildSeries(
+        whoopData.filter((item) => item.sleepPerformance !== undefined),
+        (item) => item.date,
+        (item) => item.sleepPerformance ?? 0
+      ),
+      whoop_strain: buildSeries(
+        whoopData.filter((item) => item.strainScore !== undefined),
+        (item) => item.date,
+        (item) => item.strainScore ?? 0
+      ),
+      whoop_hrv: buildSeries(
+        whoopData.filter((item) => item.hrvMs !== undefined),
+        (item) => item.date,
+        (item) => item.hrvMs ?? 0
+      ),
+      whoop_resting_hr: buildSeries(
+        whoopData.filter((item) => item.restingHeartRate !== undefined),
+        (item) => item.date,
+        (item) => item.restingHeartRate ?? 0
+      ),
     };
-  }, [checkIns, sessionReports, compReports]);
+  }, [checkIns, sessionReports, compReports, ouraData, whoopData]);
 
   const categories = useMemo<ChartCategory[]>(() => {
     return CATEGORIES.map((category) => ({
@@ -187,5 +284,7 @@ export function useTrends() {
     checkIns,
     sessionReports,
     compReports,
+    ouraData,
+    whoopData,
   };
 }

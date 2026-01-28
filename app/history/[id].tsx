@@ -1,11 +1,13 @@
 import { colors } from '@/constants/colors';
 import { HistoryFilter, useHistoryDetails, getAccentColor } from '@/hooks/use-history';
 import { useHome } from '@/hooks/use-home';
+import { useWearableDataForDate } from '@/hooks/use-wearable-data';
 import { CheckIn } from '@/models/CheckIn';
 import { CompReport } from '@/models/Competition';
 import { SessionReport } from '@/models/Session';
 import { formatDate } from '@/utils/dateFormatter';
 import { Ionicons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
@@ -263,6 +265,185 @@ const ResultsDisplaySection: React.FC<ResultsDisplaySectionProps> = ({
   );
 };
 
+// Wearable Data Section Component
+interface WearableDataSectionProps {
+  dateString: string;
+  isDark: boolean;
+}
+
+const WearableDataSection: React.FC<WearableDataSectionProps> = ({ dateString, isDark }) => {
+  const { data, isLoading } = useWearableDataForDate(dateString);
+
+  const hasOuraData = data.oura && (
+    data.oura.sleepDurationHours !== undefined ||
+    data.oura.hrv !== undefined ||
+    data.oura.readinessScore !== undefined
+  );
+
+  const hasWhoopData = data.whoop && (
+    data.whoop.recoveryScore !== undefined ||
+    data.whoop.sleepDurationHours !== undefined ||
+    data.whoop.strainScore !== undefined
+  );
+
+  if (isLoading) {
+    return (
+      <View style={[styles.wearableCard, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: isDark ? '#333' : '#E5E5E5' }]}>
+        <ActivityIndicator size="small" color={colors.blueEnergy} />
+      </View>
+    );
+  }
+
+  if (!hasOuraData && !hasWhoopData) {
+    return null;
+  }
+
+  const formatSleepHours = (hours: number | undefined): string => {
+    if (hours === undefined) return '—';
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}m`;
+  };
+
+  return (
+    <View style={[
+      styles.wearableCard,
+      {
+        backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+        borderColor: `${colors.blueEnergy}33`,
+        shadowColor: colors.blueEnergy,
+      }
+    ]}>
+      <View style={styles.wearableHeader}>
+        <MaterialCommunityIcons name="watch" size={18} color={colors.blueEnergy} />
+        <Text style={[styles.wearableTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+          Wearable Data
+        </Text>
+      </View>
+
+      {hasOuraData && (
+        <View style={styles.wearableSection}>
+          <View style={styles.wearableSectionHeader}>
+            <View style={[styles.wearableDot, { backgroundColor: '#64B4DC' }]} />
+            <Text style={styles.wearableSectionTitle}>Oura</Text>
+          </View>
+          <View style={styles.wearableMetrics}>
+            {data.oura?.sleepDurationHours !== undefined && (
+              <WearableMetric
+                icon="moon-waning-crescent"
+                label="Sleep"
+                value={formatSleepHours(data.oura.sleepDurationHours)}
+                color="#64B4DC"
+                isDark={isDark}
+              />
+            )}
+            {data.oura?.hrv !== undefined && (
+              <WearableMetric
+                icon="heart-pulse"
+                label="HRV"
+                value={`${Math.round(data.oura.hrv)}ms`}
+                color="#64B4DC"
+                isDark={isDark}
+              />
+            )}
+            {data.oura?.readinessScore !== undefined && (
+              <WearableMetric
+                icon="lightning-bolt"
+                label="Readiness"
+                value={`${data.oura.readinessScore}%`}
+                color="#64B4DC"
+                isDark={isDark}
+              />
+            )}
+            {data.oura?.averageHeartRate !== undefined && (
+              <WearableMetric
+                icon="heart"
+                label="Avg HR"
+                value={`${Math.round(data.oura.averageHeartRate)}bpm`}
+                color="#64B4DC"
+                isDark={isDark}
+              />
+            )}
+          </View>
+        </View>
+      )}
+
+      {hasWhoopData && (
+        <View style={styles.wearableSection}>
+          <View style={styles.wearableSectionHeader}>
+            <View style={[styles.wearableDot, { backgroundColor: '#DC6464' }]} />
+            <Text style={styles.wearableSectionTitle}>WHOOP</Text>
+          </View>
+          <View style={styles.wearableMetrics}>
+            {data.whoop?.recoveryScore !== undefined && (
+              <WearableMetric
+                icon="battery-charging"
+                label="Recovery"
+                value={`${Math.round(data.whoop.recoveryScore)}%`}
+                color="#DC6464"
+                isDark={isDark}
+              />
+            )}
+            {data.whoop?.sleepDurationHours !== undefined && (
+              <WearableMetric
+                icon="moon-waning-crescent"
+                label="Sleep"
+                value={formatSleepHours(data.whoop.sleepDurationHours)}
+                color="#DC6464"
+                isDark={isDark}
+              />
+            )}
+            {data.whoop?.strainScore !== undefined && (
+              <WearableMetric
+                icon="fire"
+                label="Strain"
+                value={data.whoop.strainScore.toFixed(1)}
+                color="#DC6464"
+                isDark={isDark}
+              />
+            )}
+            {data.whoop?.hrvMs !== undefined && (
+              <WearableMetric
+                icon="heart-pulse"
+                label="HRV"
+                value={`${Math.round(data.whoop.hrvMs)}ms`}
+                color="#DC6464"
+                isDark={isDark}
+              />
+            )}
+            {data.whoop?.restingHeartRate !== undefined && (
+              <WearableMetric
+                icon="heart"
+                label="RHR"
+                value={`${Math.round(data.whoop.restingHeartRate)}bpm`}
+                color="#DC6464"
+                isDark={isDark}
+              />
+            )}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Wearable Metric Component
+interface WearableMetricProps {
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+  isDark: boolean;
+}
+
+const WearableMetric: React.FC<WearableMetricProps> = ({ icon, label, value, color, isDark }) => (
+  <View style={styles.metricContainer}>
+    <MaterialCommunityIcons name={icon as never} size={14} color={color} />
+    <Text style={styles.metricLabel}>{label}</Text>
+    <Text style={[styles.metricValue, { color: isDark ? '#FFFFFF' : '#000000' }]}>{value}</Text>
+  </View>
+);
+
 export default function HistoryDetailsScreen() {
   const { id, type: rawType } = useLocalSearchParams<{ id: string; type: string }>();
   const colorScheme = useColorScheme();
@@ -398,6 +579,7 @@ Powered By Forge - Performance Journal`;
 
   const renderCheckInContent = (checkIn: CheckIn) => (
     <>
+      <WearableDataSection dateString={checkIn.check_in_date} isDark={isDark} />
       <RatingDisplaySection
         title="Overall Readiness"
         value={`${checkIn.overall_score}%`}
@@ -865,5 +1047,66 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginHorizontal: 16,
+  },
+  // Wearable Data Card
+  wearableCard: {
+    marginHorizontal: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    gap: 14,
+  },
+  wearableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  wearableTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  wearableSection: {
+    gap: 10,
+  },
+  wearableSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  wearableDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  wearableSectionTitle: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '600',
+  },
+  wearableMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  metricContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+    borderRadius: 8,
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#999',
+  },
+  metricValue: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
