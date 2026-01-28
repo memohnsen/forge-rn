@@ -1,8 +1,8 @@
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect } from 'react';
-import { useRevenueCat } from '@/hooks/use-revenuecat';
+import { useEffect, useState } from 'react';
+import Purchases from 'react-native-purchases';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -28,10 +28,45 @@ if (!publishableKey) {
 }
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  useRevenueCat();
+  const [isRevenueCatConfigured, setIsRevenueCatConfigured] = useState(false);
+
+  // Initialize RevenueCat
+  useEffect(() => {
+    const revenuecatKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
+    if (revenuecatKey) {
+      try {
+        Purchases.configure({ apiKey: revenuecatKey });
+        setIsRevenueCatConfigured(true);
+      } catch (error) {
+        console.error('Error configuring RevenueCat:', error);
+      }
+    } else {
+      console.warn('Missing EXPO_PUBLIC_REVENUECAT_KEY; skipping RevenueCat configuration.');
+    }
+  }, []);
+
+  // Login user to RevenueCat when authenticated
+  useEffect(() => {
+    if (!isRevenueCatConfigured) return;
+
+    if (userId) {
+      Purchases.logIn(userId)
+        .then(({ created }) => {
+          console.log('Logged in to RevenueCat with user ID:', userId);
+          console.log('New user created:', created);
+        })
+        .catch((error) => {
+          console.error('Error logging in to RevenueCat:', error);
+        });
+    } else {
+      Purchases.logOut().catch((error) => {
+        console.error('Error logging out of RevenueCat:', error);
+      });
+    }
+  }, [userId, isRevenueCatConfigured]);
 
   useEffect(() => {
     if (!isLoaded) return;

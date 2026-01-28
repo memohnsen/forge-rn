@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RevenueCatUI from 'react-native-purchases-ui';
+import { RevenueCatUI } from 'react-native-purchases-ui';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -66,34 +66,12 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleCustomerCenter = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert('Support', 'Customer Center is not available on web.');
-      return;
-    }
-
-    if (Platform.OS === 'ios') {
-      const majorVersion =
-        typeof Platform.Version === 'string'
-          ? Number.parseInt(Platform.Version.split('.')[0] ?? '0', 10)
-          : Platform.Version;
-      if (Number.isFinite(majorVersion) && majorVersion < 15) {
-        Alert.alert('Support', 'Customer Center requires iOS 15 or newer.');
-        return;
-      }
-    } else if (Platform.OS === 'android') {
-      const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : Number.NaN;
-      if (Number.isFinite(apiLevel) && apiLevel < 24) {
-        Alert.alert('Support', 'Customer Center requires Android 7.0 or newer.');
-        return;
-      }
-    }
-
+  const handleCustomerSupport = async () => {
     try {
       await RevenueCatUI.presentCustomerCenter();
     } catch (error) {
-      console.error('Customer Center error:', error);
-      Alert.alert('Support', 'Unable to open the support center. Please try again.');
+      console.error('Error presenting Customer Center:', error);
+      Alert.alert('Error', 'Unable to open Customer Support. Please try again later.');
     }
   };
 
@@ -166,7 +144,7 @@ export default function SettingsScreen() {
             title="Customer Support"
             accentColor="#64A0DC"
             isDark={isDark}
-            onPress={handleCustomerCenter}
+            onPress={handleCustomerSupport}
           />
           <SettingsRow
             icon="message-text"
