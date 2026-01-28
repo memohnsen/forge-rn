@@ -140,12 +140,26 @@ export const isOuraConnected = async (userId: string): Promise<boolean> => {
 
 // MARK: - OAuth Flow
 
+let currentAuthState: string | null = null;
+
+const generateRandomState = (): string => {
+  const array = new Uint8Array(16);
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.getRandomValues) {
+    throw new Error('Secure RNG unavailable');
+  }
+  cryptoObj.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
 const buildAuthorizationURL = (): string => {
+  currentAuthState = generateRandomState();
   const params = new URLSearchParams({
     client_id: OURA_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: 'code',
     scope: OURA_SCOPES,
+    state: currentAuthState,
   });
   return `https://cloud.ouraring.com/oauth/authorize?${params.toString()}`;
 };
@@ -191,6 +205,18 @@ export const authenticateOura = async (
     }
 
     const url = Linking.parse(result.url);
+
+    const error = url.queryParams?.error as string | undefined;
+    if (error) {
+      const errorDescription = url.queryParams?.error_description as string | undefined;
+      throw new Error(`OAuth error: ${error} - ${errorDescription}`);
+    }
+
+    const receivedState = url.queryParams?.state as string | undefined;
+    if (currentAuthState && receivedState !== currentAuthState) {
+      throw new Error('State mismatch - potential CSRF attack');
+    }
+
     const code = url.queryParams?.code as string | undefined;
 
     if (!code) {
@@ -204,10 +230,12 @@ export const authenticateOura = async (
       await saveOuraRefreshToken(tokenResponse.refresh_token, userId);
     }
 
+    currentAuthState = null;
     console.log('[Oura] Authentication successful');
     return true;
   } catch (error) {
     console.error('[Oura] Authentication failed:', error);
+    currentAuthState = null;
     throw error;
   }
 };
@@ -405,7 +433,7 @@ export const syncOuraRefreshTokenToDatabase = async (
       refreshToken = await getOuraRefreshToken(userId);
     }
 
-    await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -415,6 +443,11 @@ export const syncOuraRefreshTokenToDatabase = async (
       },
       body: JSON.stringify({ oura_refresh_token: refreshToken }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
+    }
 
     console.log('[Oura] Synced refresh token to database');
   } catch (error) {
@@ -433,7 +466,7 @@ export const updateStoreTokenPreference = async (
       throw new Error('No Clerk token available');
     }
 
-    await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -443,6 +476,11 @@ export const updateStoreTokenPreference = async (
       },
       body: JSON.stringify({ store_token: shouldStore }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
+    }
 
     console.log('[Oura] Updated store token preference');
   } catch (error) {

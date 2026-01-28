@@ -17,7 +17,7 @@ export interface WearableDataForDate {
 }
 
 export function useWearableDataForDate(dateString: string) {
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const [data, setData] = useState<WearableDataForDate>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -68,6 +68,8 @@ export function useWearableDataForDate(dateString: string) {
 
   const fetchData = useCallback(async () => {
     if (!userId || !dateString) {
+      setData({});
+      setError(null);
       setIsLoading(false);
       return;
     }
@@ -87,9 +89,18 @@ export function useWearableDataForDate(dateString: string) {
       const endDate = new Date(targetDate);
       endDate.setDate(endDate.getDate() + 1); // Day after for safety
 
+      const getClerkToken = async () => {
+        try {
+          return await getToken({ template: 'supabase' });
+        } catch (error) {
+          console.warn('[useWearableDataForDate] Failed to get Clerk token:', error);
+          return null;
+        }
+      };
+
       const [ouraConnected, whoopConnected] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId),
+        isWhoopConnected(userId, getClerkToken),
       ]);
 
       const result: WearableDataForDate = {};
@@ -98,7 +109,7 @@ export function useWearableDataForDate(dateString: string) {
       if (ouraConnected) {
         try {
           const ouraData = await fetchOuraDailyData(userId, startDate, endDate);
-      result.oura = findClosestByDate(ouraData, targetDate, 1) ?? undefined;
+          result.oura = findClosestByDate(ouraData, targetDate, 1) ?? undefined;
         } catch (ouraError) {
           console.warn('[useWearableDataForDate] Failed to fetch Oura data:', ouraError);
         }
@@ -107,7 +118,7 @@ export function useWearableDataForDate(dateString: string) {
       // Fetch Whoop data
       if (whoopConnected) {
         try {
-          const whoopData = await fetchWhoopDailyData(userId, startDate, endDate);
+          const whoopData = await fetchWhoopDailyData(userId, startDate, endDate, getClerkToken);
           result.whoop = findClosestByDate(whoopData, targetDate, 1) ?? undefined;
         } catch (whoopError) {
           console.warn('[useWearableDataForDate] Failed to fetch Whoop data:', whoopError);
@@ -123,7 +134,7 @@ export function useWearableDataForDate(dateString: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, dateString]);
+  }, [userId, dateString, getToken]);
 
   useEffect(() => {
     fetchData();
@@ -138,7 +149,7 @@ export function useWearableDataForDate(dateString: string) {
 }
 
 export function useWearableConnectionStatus() {
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,9 +162,18 @@ export function useWearableConnectionStatus() {
 
     setIsLoading(true);
     try {
+      const getClerkToken = async () => {
+        try {
+          return await getToken({ template: 'supabase' });
+        } catch (error) {
+          console.warn('[useWearableConnectionStatus] Failed to get Clerk token:', error);
+          return null;
+        }
+      };
+
       const [oura, whoop] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId),
+        isWhoopConnected(userId, getClerkToken),
       ]);
       setOuraConnected(oura);
       setWhoopConnected(whoop);
@@ -162,7 +182,7 @@ export function useWearableConnectionStatus() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, getToken]);
 
   useEffect(() => {
     checkStatus();

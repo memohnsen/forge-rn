@@ -69,6 +69,15 @@ export function useTrends() {
     });
   }, []);
 
+  const getClerkToken = useCallback(async () => {
+    try {
+      return await getTokenRef.current({ template: 'supabase' });
+    } catch (error) {
+      console.warn('[useTrends] Failed to get Clerk token:', error);
+      return null;
+    }
+  }, []);
+
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
   const [compReports, setCompReports] = useState<CompReport[]>([]);
@@ -126,7 +135,7 @@ export function useTrends() {
 
       const [ouraConnectedResult, whoopConnectedResult] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId),
+        isWhoopConnected(userId, getClerkToken),
       ]);
       setOuraConnected(ouraConnectedResult);
       setWhoopConnected(whoopConnectedResult);
@@ -148,7 +157,7 @@ export function useTrends() {
       // Fetch Whoop data if connected
       if (whoopConnectedResult) {
         try {
-          const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo);
+          const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo, undefined, getClerkToken);
           setWhoopData(whoopResult);
           console.log(`[useTrends] Fetched ${whoopResult.length} Whoop records`);
         } catch (whoopError) {

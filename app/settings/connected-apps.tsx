@@ -80,7 +80,7 @@ export default function ConnectedAppsScreen() {
       try {
         const [ouraStatus, whoopStatus, storePreference] = await Promise.all([
           isOuraConnected(userId),
-          isWhoopConnected(userId),
+        isWhoopConnected(userId, getClerkToken),
           loadStoreTokenPreference(userId, getClerkToken),
         ]);
 
@@ -210,6 +210,7 @@ export default function ConnectedAppsScreen() {
     } catch (error) {
       console.error('Failed to update store token preference:', error);
       setStoreToken(!newValue); // Revert on error
+      Alert.alert('Store Data Preference', 'Unable to save preference — please try again.');
     }
   };
 

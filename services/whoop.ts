@@ -171,9 +171,18 @@ export const deleteWhoopTokens = async (userId: string): Promise<void> => {
   }
 };
 
-export const isWhoopConnected = async (userId: string): Promise<boolean> => {
+export const isWhoopConnected = async (
+  userId: string,
+  getClerkToken?: () => Promise<string | null>
+): Promise<boolean> => {
   const token = await getWhoopAccessToken(userId);
-  return token !== null;
+  if (token) return true;
+  if (!getClerkToken) return false;
+
+  const refreshed = await refreshWhoopToken(userId, getClerkToken);
+  if (!refreshed) return false;
+  const newToken = await getWhoopAccessToken(userId);
+  return newToken !== null;
 };
 
 // MARK: - OAuth Flow
@@ -182,9 +191,11 @@ let currentAuthState: string | null = null;
 
 const generateRandomState = (): string => {
   const array = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    array[i] = Math.floor(Math.random() * 256);
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.getRandomValues) {
+    throw new Error('Secure RNG unavailable');
   }
+  cryptoObj.getRandomValues(array);
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
@@ -360,16 +371,63 @@ const formatDateForAPI = (date: Date): string => {
   return date.toISOString();
 };
 
-export const fetchWhoopRecovery = async (
+const getWhoopAccessTokenWithRefresh = async (
   userId: string,
-  startDate?: Date,
-  endDate?: Date
-): Promise<WhoopRecovery[]> => {
-  const accessToken = await getWhoopAccessToken(userId);
-  if (!accessToken) {
+  getClerkToken?: () => Promise<string | null>
+): Promise<string> => {
+  const token = await getWhoopAccessToken(userId);
+  if (token) return token;
+  if (!getClerkToken) {
     throw new Error('No access token available');
   }
 
+  const refreshed = await refreshWhoopToken(userId, getClerkToken);
+  if (!refreshed) {
+    throw new Error('No access token available');
+  }
+
+  const newToken = await getWhoopAccessToken(userId);
+  if (!newToken) {
+    throw new Error('No access token available');
+  }
+
+  return newToken;
+};
+
+const fetchWhoopWithAuth = async (
+  url: string,
+  userId: string,
+  getClerkToken?: () => Promise<string | null>
+): Promise<Response> => {
+  let accessToken = await getWhoopAccessTokenWithRefresh(userId, getClerkToken);
+
+  let response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && getClerkToken) {
+    const refreshed = await refreshWhoopToken(userId, getClerkToken);
+    if (refreshed) {
+      accessToken = await getWhoopAccessTokenWithRefresh(userId, getClerkToken);
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    }
+  }
+
+  return response;
+};
+
+export const fetchWhoopRecovery = async (
+  userId: string,
+  startDate?: Date,
+  endDate?: Date,
+  getClerkToken?: () => Promise<string | null>
+): Promise<WhoopRecovery[]> => {
   const params = new URLSearchParams();
   if (startDate) {
     params.append('start', formatDateForAPI(startDate));
@@ -380,11 +438,7 @@ export const fetchWhoopRecovery = async (
 
   const url = `https://api.prod.whoop.com/developer/v2/recovery${params.toString() ? `?${params.toString()}` : ''}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchWhoopWithAuth(url, userId, getClerkToken);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -403,13 +457,9 @@ export const fetchWhoopRecovery = async (
 export const fetchWhoopSleep = async (
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  getClerkToken?: () => Promise<string | null>
 ): Promise<WhoopSleep[]> => {
-  const accessToken = await getWhoopAccessToken(userId);
-  if (!accessToken) {
-    throw new Error('No access token available');
-  }
-
   const params = new URLSearchParams();
   if (startDate) {
     params.append('start', formatDateForAPI(startDate));
@@ -420,11 +470,7 @@ export const fetchWhoopSleep = async (
 
   const url = `https://api.prod.whoop.com/developer/v2/activity/sleep${params.toString() ? `?${params.toString()}` : ''}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchWhoopWithAuth(url, userId, getClerkToken);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -442,13 +488,9 @@ export const fetchWhoopSleep = async (
 export const fetchWhoopCycle = async (
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  getClerkToken?: () => Promise<string | null>
 ): Promise<WhoopCycle[]> => {
-  const accessToken = await getWhoopAccessToken(userId);
-  if (!accessToken) {
-    throw new Error('No access token available');
-  }
-
   const params = new URLSearchParams();
   if (startDate) {
     params.append('start', formatDateForAPI(startDate));
@@ -459,11 +501,7 @@ export const fetchWhoopCycle = async (
 
   const url = `https://api.prod.whoop.com/developer/v2/cycle${params.toString() ? `?${params.toString()}` : ''}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetchWhoopWithAuth(url, userId, getClerkToken);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -488,17 +526,14 @@ const getSleepDurationHours = (sleep: WhoopSleep): number | undefined => {
 };
 
 const formatDateKey = (isoString: string): string => {
-  const date = new Date(isoString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return isoString.split('T')[0] ?? isoString;
 };
 
 export const fetchWhoopDailyData = async (
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  getClerkToken?: () => Promise<string | null>
 ): Promise<WhoopDailyData[]> => {
   const now = new Date();
   const finalEndDate = endDate || now;
@@ -508,9 +543,9 @@ export const fetchWhoopDailyData = async (
     console.log('[Whoop] Fetching daily data');
 
     const [recoveries, sleeps, cycles] = await Promise.all([
-      fetchWhoopRecovery(userId, finalStartDate, finalEndDate),
-      fetchWhoopSleep(userId, finalStartDate, finalEndDate),
-      fetchWhoopCycle(userId, finalStartDate, finalEndDate),
+      fetchWhoopRecovery(userId, finalStartDate, finalEndDate, getClerkToken),
+      fetchWhoopSleep(userId, finalStartDate, finalEndDate, getClerkToken),
+      fetchWhoopCycle(userId, finalStartDate, finalEndDate, getClerkToken),
     ]);
 
     console.log(`[Whoop] Fetched ${recoveries.length} recovery, ${sleeps.length} sleep, ${cycles.length} cycle records`);
@@ -581,7 +616,7 @@ export const syncWhoopRefreshTokenToDatabase = async (
       refreshToken = await getWhoopRefreshToken(userId);
     }
 
-    await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -591,6 +626,11 @@ export const syncWhoopRefreshTokenToDatabase = async (
       },
       body: JSON.stringify({ whoop_refresh_token: refreshToken }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
+    }
 
     console.log('[Whoop] Synced refresh token to database');
   } catch (error) {
