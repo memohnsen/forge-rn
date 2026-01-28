@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Purchases from 'react-native-purchases';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -60,6 +61,15 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {} },
     ]);
+  };
+
+  const handleCustomerSupport = async () => {
+    try {
+      await Purchases.presentCustomerCenter();
+    } catch (error) {
+      console.error('Error presenting Customer Center:', error);
+      Alert.alert('Error', 'Unable to open Customer Support. Please try again later.');
+    }
   };
 
   const handleSaveCoachEmail = async (email: string) => {
@@ -131,7 +141,7 @@ export default function SettingsScreen() {
             title="Customer Support"
             accentColor="#64A0DC"
             isDark={isDark}
-            onPress={() => Alert.alert('Support', 'We will open the support center.')}
+            onPress={handleCustomerSupport}
           />
           <SettingsRow
             icon="message-text"

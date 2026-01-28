@@ -19,7 +19,7 @@ todos:
     status: pending
   - id: revenuecat
     content: Implement RevenueCat Customer Center integration
-    status: pending
+    status: completed
 isProject: false
 ---
 

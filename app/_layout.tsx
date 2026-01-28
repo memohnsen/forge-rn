@@ -2,6 +2,7 @@ import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
+import Purchases from 'react-native-purchases';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -27,9 +28,31 @@ if (!publishableKey) {
 }
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Initialize RevenueCat
+  useEffect(() => {
+    const revenuecatKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+    if (revenuecatKey) {
+      Purchases.configure({ apiKey: revenuecatKey });
+    }
+  }, []);
+
+  // Login user to RevenueCat when authenticated
+  useEffect(() => {
+    if (userId) {
+      Purchases.logIn(userId)
+        .then(({ customerInfo, created }) => {
+          console.log('Logged in to RevenueCat with user ID:', userId);
+          console.log('New user created:', created);
+        })
+        .catch((error) => {
+          console.error('Error logging in to RevenueCat:', error);
+        });
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (!isLoaded) return;
