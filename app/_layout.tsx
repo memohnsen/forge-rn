@@ -50,15 +50,21 @@ function InitialLayout() {
 
   // Login user to RevenueCat when authenticated
   useEffect(() => {
-    if (userId && isRevenueCatConfigured) {
+    if (!isRevenueCatConfigured) return;
+
+    if (userId) {
       Purchases.logIn(userId)
-        .then(({ customerInfo, created }) => {
+        .then(({ created }) => {
           console.log('Logged in to RevenueCat with user ID:', userId);
           console.log('New user created:', created);
         })
         .catch((error) => {
           console.error('Error logging in to RevenueCat:', error);
         });
+    } else {
+      Purchases.logOut().catch((error) => {
+        console.error('Error logging out of RevenueCat:', error);
+      });
     }
   }, [userId, isRevenueCatConfigured]);
 

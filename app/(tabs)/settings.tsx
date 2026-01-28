@@ -17,8 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Purchases from 'react-native-purchases';
-import RevenueCatUI from 'react-native-purchases-ui';
+import { RevenueCatUI } from 'react-native-purchases-ui';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
