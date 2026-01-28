@@ -4,7 +4,8 @@ import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
 import { DEFAULT_SELECTED, TIME_FRAMES, type ChartConfig, type ChartCategory, type TrendPoint } from '@/utils/trends-data';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Modal,
   Pressable,
@@ -24,35 +25,90 @@ export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { categories } = useTrends();
+  const { categories, ouraConnected, whoopConnected } = useTrends();
 
   const [selectedFilter, setSelectedFilter] = useState('Check-Ins');
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
   const [selectedCharts, setSelectedCharts] = useState<Set<string>>(DEFAULT_SELECTED);
   const [showTimeFrameSheet, setShowTimeFrameSheet] = useState(false);
   const [showChartSelection, setShowChartSelection] = useState(false);
+  const autoSelectedRef = useRef({ oura: false, whoop: false });
+  const hasLoadedChartsRef = useRef(false);
 
-  const isOuraConnected = useMemo(() => {
-    const oura = categories.find((category) => category.id === 'Oura');
-    return Boolean(oura?.charts.some((chart) => chart.data.length > 0));
-  }, [categories]);
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('trends_selected_charts_v1');
+        if (!stored || !isActive) return;
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setSelectedCharts(new Set(parsed));
+        }
+      } catch (error) {
+        console.warn('Failed to load selected charts:', error);
+      } finally {
+        if (isActive) {
+          hasLoadedChartsRef.current = true;
+        }
+      }
+    })();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
-  const isWhoopConnected = useMemo(() => {
-    const whoop = categories.find((category) => category.id === 'Whoop');
-    return Boolean(whoop?.charts.some((chart) => chart.data.length > 0));
-  }, [categories]);
+  useEffect(() => {
+    if (!hasLoadedChartsRef.current) return;
+    (async () => {
+      try {
+        await AsyncStorage.setItem(
+          'trends_selected_charts_v1',
+          JSON.stringify(Array.from(selectedCharts))
+        );
+      } catch (error) {
+        console.warn('Failed to persist selected charts:', error);
+      }
+    })();
+  }, [selectedCharts]);
 
   const availableCategories = useMemo(
     () =>
       categories.filter((category) => {
-        if (category.id === 'Oura') return isOuraConnected;
-        if (category.id === 'Whoop') return isWhoopConnected;
+        if (category.id === 'Oura') return ouraConnected;
+        if (category.id === 'Whoop') return whoopConnected;
         return true;
       }),
-    [categories, isOuraConnected, isWhoopConnected]
+    [categories, ouraConnected, whoopConnected]
   );
 
   const currentCategory = availableCategories.find((category) => category.id === selectedFilter);
+
+  useEffect(() => {
+    if (!autoSelectedRef.current.oura && ouraConnected) {
+      const ouraCategory = categories.find((category) => category.id === 'Oura');
+      if (ouraCategory && !ouraCategory.charts.some((chart) => selectedCharts.has(chart.id))) {
+        setSelectedCharts((prev) => {
+          const next = new Set(prev);
+          ouraCategory.charts.forEach((chart) => next.add(chart.id));
+          return next;
+        });
+      }
+      autoSelectedRef.current.oura = true;
+    }
+
+    if (!autoSelectedRef.current.whoop && whoopConnected) {
+      const whoopCategory = categories.find((category) => category.id === 'Whoop');
+      if (whoopCategory && !whoopCategory.charts.some((chart) => selectedCharts.has(chart.id))) {
+        setSelectedCharts((prev) => {
+          const next = new Set(prev);
+          whoopCategory.charts.forEach((chart) => next.add(chart.id));
+          return next;
+        });
+      }
+      autoSelectedRef.current.whoop = true;
+    }
+  }, [categories, ouraConnected, whoopConnected, selectedCharts]);
 
   const toggleChart = (chartId: string) => {
     setSelectedCharts((prev) => {

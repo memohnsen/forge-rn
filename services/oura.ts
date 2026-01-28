@@ -338,6 +338,24 @@ const getSleepDurationHours = (sleep: OuraSleep): number | undefined => {
   return undefined;
 };
 
+const toLocalDateKey = (isoString: string): string => {
+  const date = new Date(isoString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getOuraDateKey = (sleep: OuraSleep): string => {
+  if (sleep.bedtime_end) {
+    return toLocalDateKey(sleep.bedtime_end);
+  }
+  if (sleep.bedtime_start) {
+    return toLocalDateKey(sleep.bedtime_start);
+  }
+  return sleep.day;
+};
+
 export const fetchOuraDailyData = async (
   userId: string,
   startDate?: Date,
@@ -351,7 +369,7 @@ export const fetchOuraDailyData = async (
     const sleepData = await fetchOuraSleep(userId, finalStartDate, finalEndDate);
 
     const dailyData: OuraDailyData[] = sleepData.map((sleep) => ({
-      date: sleep.day,
+      date: getOuraDateKey(sleep),
       sleepDurationHours: getSleepDurationHours(sleep),
       hrv: sleep.average_hrv,
       averageHeartRate: sleep.average_heart_rate,

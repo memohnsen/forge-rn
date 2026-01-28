@@ -22,6 +22,50 @@ export function useWearableDataForDate(dateString: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const parseLocalDate = (value: string) => {
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (dateOnlyMatch) {
+      const [, y, m, d] = dateOnlyMatch;
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+    return new Date(value);
+  };
+
+  const toLocalDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const toLocalDate = (dateKey: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!match) return null;
+    const [, y, m, d] = match;
+    return new Date(Number(y), Number(m) - 1, Number(d));
+  };
+
+  const findClosestByDate = <T extends { date: string }>(
+    items: T[],
+    target: Date,
+    maxDayDiff: number
+  ) => {
+    const targetKey = toLocalDateKey(target);
+    let closest: { item: T; diff: number } | null = null;
+    for (const item of items) {
+      if (item.date === targetKey) return item;
+      const itemDate = toLocalDate(item.date);
+      if (!itemDate) continue;
+      const diffDays = Math.abs(
+        (itemDate.getTime() - target.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (diffDays <= maxDayDiff && (!closest || diffDays < closest.diff)) {
+        closest = { item, diff: diffDays };
+      }
+    }
+    return closest?.item ?? null;
+  };
+
   const fetchData = useCallback(async () => {
     if (!userId || !dateString) {
       setIsLoading(false);
@@ -32,7 +76,7 @@ export function useWearableDataForDate(dateString: string) {
     setError(null);
 
     try {
-      const targetDate = new Date(dateString);
+      const targetDate = parseLocalDate(dateString);
       if (isNaN(targetDate.getTime())) {
         throw new Error('Invalid date string');
       }
@@ -54,8 +98,7 @@ export function useWearableDataForDate(dateString: string) {
       if (ouraConnected) {
         try {
           const ouraData = await fetchOuraDailyData(userId, startDate, endDate);
-          const targetDateStr = dateString.split('T')[0]; // Normalize to YYYY-MM-DD
-          result.oura = ouraData.find((item) => item.date === targetDateStr);
+      result.oura = findClosestByDate(ouraData, targetDate, 1) ?? undefined;
         } catch (ouraError) {
           console.warn('[useWearableDataForDate] Failed to fetch Oura data:', ouraError);
         }
@@ -65,8 +108,7 @@ export function useWearableDataForDate(dateString: string) {
       if (whoopConnected) {
         try {
           const whoopData = await fetchWhoopDailyData(userId, startDate, endDate);
-          const targetDateStr = dateString.split('T')[0];
-          result.whoop = whoopData.find((item) => item.date === targetDateStr);
+          result.whoop = findClosestByDate(whoopData, targetDate, 1) ?? undefined;
         } catch (whoopError) {
           console.warn('[useWearableDataForDate] Failed to fetch Whoop data:', whoopError);
         }

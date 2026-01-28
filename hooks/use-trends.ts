@@ -74,6 +74,8 @@ export function useTrends() {
   const [compReports, setCompReports] = useState<CompReport[]>([]);
   const [ouraData, setOuraData] = useState<OuraDailyData[]>([]);
   const [whoopData, setWhoopData] = useState<WhoopDailyData[]>([]);
+  const [ouraConnected, setOuraConnected] = useState(false);
+  const [whoopConnected, setWhoopConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -81,6 +83,8 @@ export function useTrends() {
     if (!isLoaded || !userId || isRefreshingRef.current) {
       if (!isLoaded || !userId) {
         setIsLoading(false);
+        setOuraConnected(false);
+        setWhoopConnected(false);
       }
       return;
     }
@@ -120,13 +124,15 @@ export function useTrends() {
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-      const [ouraConnected, whoopConnected] = await Promise.all([
+      const [ouraConnectedResult, whoopConnectedResult] = await Promise.all([
         isOuraConnected(userId),
         isWhoopConnected(userId),
       ]);
+      setOuraConnected(ouraConnectedResult);
+      setWhoopConnected(whoopConnectedResult);
 
       // Fetch Oura data if connected
-      if (ouraConnected) {
+      if (ouraConnectedResult) {
         try {
           const ouraResult = await fetchOuraDailyData(userId, ninetyDaysAgo);
           setOuraData(ouraResult);
@@ -140,7 +146,7 @@ export function useTrends() {
       }
 
       // Fetch Whoop data if connected
-      if (whoopConnected) {
+      if (whoopConnectedResult) {
         try {
           const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo);
           setWhoopData(whoopResult);
@@ -278,6 +284,8 @@ export function useTrends() {
 
   return {
     categories,
+    ouraConnected,
+    whoopConnected,
     isLoading,
     error,
     refresh,

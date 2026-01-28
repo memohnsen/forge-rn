@@ -673,6 +673,7 @@ Powered By Forge - Performance Journal`;
 
   const renderSessionContent = (session: SessionReport) => (
     <>
+      <WearableDataSection dateString={session.session_date} isDark={isDark} />
       <TextDisplaySection
         title="Time of day you trained"
         value={session.time_of_day}
@@ -740,6 +741,7 @@ Powered By Forge - Performance Journal`;
 
     return (
       <>
+        <WearableDataSection dateString={comp.meet_date} isDark={isDark} />
         <ResultsDisplaySection comp={comp} userSport={userSport} isDark={isDark} />
         <RatingDisplaySection title="Total" value={`${total}kg`} isRawValue isDark={isDark} />
         <TextDisplaySection title="Bodyweight" value={`${comp.bodyweight}kg`} isDark={isDark} />
