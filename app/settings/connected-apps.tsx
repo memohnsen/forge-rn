@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,7 +39,7 @@ export default function ConnectedAppsScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId, getToken } = useAuth();
+  const { userId, getToken, isLoaded, isSignedIn } = useAuth();
 
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
@@ -47,34 +47,61 @@ export default function ConnectedAppsScreen() {
   const [whoopLoading, setWhoopLoading] = useState(false);
   const [storeToken, setStoreToken] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-
-  const getClerkToken = useCallback(async () => {
-    return getToken({ template: 'supabase', skipCache: true });
-  }, [getToken]);
-
-  const checkConnectionStatus = useCallback(async () => {
-    if (!userId) return;
-
-    setIsLoadingStatus(true);
-    try {
-      const [ouraStatus, whoopStatus, storePreference] = await Promise.all([
-        isOuraConnected(userId),
-        isWhoopConnected(userId),
-        loadStoreTokenPreference(userId, getClerkToken),
-      ]);
-      setOuraConnected(ouraStatus);
-      setWhoopConnected(whoopStatus);
-      setStoreToken(storePreference);
-    } catch (error) {
-      console.error('Failed to check connection status:', error);
-    } finally {
-      setIsLoadingStatus(false);
-    }
-  }, [userId, getClerkToken]);
+  const hasLoadedStatusRef = useRef(false);
+  const getTokenRef = useRef(getToken);
 
   useEffect(() => {
-    checkConnectionStatus();
-  }, [checkConnectionStatus]);
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
+  const getClerkToken = useCallback(async () => {
+    try {
+      return await getTokenRef.current({ template: 'supabase' });
+    } catch (error) {
+      console.warn('Failed to get Clerk token for Supabase:', error);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!isLoaded || !isSignedIn || !userId) {
+      setIsLoadingStatus(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    if (!hasLoadedStatusRef.current) {
+      setIsLoadingStatus(true);
+    }
+    (async () => {
+      try {
+        const [ouraStatus, whoopStatus, storePreference] = await Promise.all([
+          isOuraConnected(userId),
+          isWhoopConnected(userId),
+          loadStoreTokenPreference(userId, getClerkToken),
+        ]);
+
+        if (!isActive) return;
+        setOuraConnected(ouraStatus);
+        setWhoopConnected(whoopStatus);
+        setStoreToken(storePreference);
+        hasLoadedStatusRef.current = true;
+      } catch (error) {
+        console.error('Failed to check connection status:', error);
+      } finally {
+        if (isActive) {
+          setIsLoadingStatus(false);
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isLoaded, isSignedIn, userId, getClerkToken]);
 
   const handleOuraPress = async () => {
     if (!userId) return;
