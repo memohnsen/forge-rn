@@ -190,10 +190,25 @@ export default function OnboardingScreen() {
   const handleCompleteOnboarding = async () => {
     // Guard against re-entrancy from rapid taps
     if (isLoading) return;
-    if (!userId) return;
-
     setIsLoading(true);
     setErrorMessage(null);
+
+    if (!userId) {
+      try {
+        // Pre-auth onboarding: mark device-level completion and route to sign-in
+        await SecureStore.setItemAsync('hasSeenOnboarding_device', 'true');
+        router.replace('/(auth)/sign-in');
+      } catch (err: unknown) {
+        console.error('Error completing pre-auth onboarding:', err);
+        const message =
+          err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+        setErrorMessage(message);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     try {
       // Format date as local YYYY-MM-DD to avoid UTC timezone shifts
       const year = data.nextCompDate.getFullYear();

@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { SplashScreen } from '@/components/SplashScreen';
+import { View } from 'react-native';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -34,7 +35,11 @@ function InitialLayout() {
   const router = useRouter();
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const [showSplash, setShowSplash] = useState(true);
+  const [hasCompletedPreAuthOnboarding, setHasCompletedPreAuthOnboarding] =
+    useState<boolean | null>(null);
+  const [splashMinDone, setSplashMinDone] = useState(false);
+  const [targetGroup, setTargetGroup] = useState<string | null>(null);
+  const [routeReady, setRouteReady] = useState(false);
 
   // User-scoped key to prevent cross-account onboarding status leaks
   const getOnboardingKey = useCallback(
@@ -45,6 +50,19 @@ function InitialLayout() {
     (uid: string) => `forceOnboarding_${uid}`,
     []
   );
+  const preAuthOnboardingKey = 'hasSeenOnboarding_device';
+
+  const checkPreAuthOnboardingStatus = useCallback(async () => {
+    try {
+      const cachedStatus = await SecureStore.getItemAsync(preAuthOnboardingKey);
+      setHasCompletedPreAuthOnboarding(cachedStatus === 'true');
+    } catch (err) {
+      console.error('Error checking pre-auth onboarding status:', err);
+      setHasCompletedPreAuthOnboarding(false);
+    } finally {
+      setIsCheckingOnboarding(false);
+    }
+  }, []);
 
   const checkOnboardingStatus = useCallback(async () => {
     if (!userId) {
@@ -102,57 +120,89 @@ function InitialLayout() {
     if (isSignedIn && userId) {
       checkOnboardingStatus();
     } else {
-      setIsCheckingOnboarding(false);
       setHasCompletedOnboarding(null);
+      checkPreAuthOnboardingStatus();
     }
-  }, [isSignedIn, userId, checkOnboardingStatus]);
+  }, [isSignedIn, userId, checkOnboardingStatus, checkPreAuthOnboardingStatus]);
 
-  // Hide splash screen after 2 seconds
+  // Keep splash visible for at least 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
-      setShowSplash(false);
+      setSplashMinDone(true);
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || isCheckingOnboarding || showSplash) return;
+    if (!isLoaded || isCheckingOnboarding) return;
+
+    if (isSignedIn) {
+      if (hasCompletedOnboarding === false) {
+        setTargetGroup('(onboarding)');
+      } else if (hasCompletedOnboarding === true) {
+        setTargetGroup('(tabs)');
+      } else {
+        setTargetGroup(null);
+      }
+    } else {
+      if (hasCompletedPreAuthOnboarding === true) {
+        setTargetGroup('(auth)');
+      } else {
+        setTargetGroup('(onboarding)');
+      }
+    }
+  }, [
+    isLoaded,
+    isSignedIn,
+    isCheckingOnboarding,
+    hasCompletedOnboarding,
+    hasCompletedPreAuthOnboarding,
+  ]);
+
+  useEffect(() => {
+    if (!targetGroup) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
+    const inTabsGroup = segments[0] === '(tabs)';
 
-    if (isSignedIn) {
-      if (hasCompletedOnboarding === false && !inOnboardingGroup) {
-        // Signed in but hasn't completed onboarding
-        router.replace('/(onboarding)');
-      } else if (hasCompletedOnboarding === true && (inAuthGroup || inOnboardingGroup)) {
-        // Signed in and completed onboarding, go to main app
-        router.replace('/(tabs)');
-      }
-    } else if (!inAuthGroup) {
-      // Not signed in and not on auth screen, redirect to sign in
-      router.replace('/(auth)/sign-in');
+    if (targetGroup === '(auth)') {
+      if (!inAuthGroup) router.replace('/(auth)/sign-in');
+    } else if (targetGroup === '(onboarding)') {
+      if (!inOnboardingGroup) router.replace('/(onboarding)');
+    } else if (targetGroup === '(tabs)') {
+      if (!inTabsGroup) router.replace('/(tabs)');
     }
-  }, [isLoaded, isSignedIn, segments, isCheckingOnboarding, hasCompletedOnboarding, showSplash]);
 
-  // Show splash screen while loading
-  if (showSplash || !isLoaded || isCheckingOnboarding) {
-    return <SplashScreen />;
-  }
+    if (
+      (targetGroup === '(auth)' && inAuthGroup) ||
+      (targetGroup === '(onboarding)' && inOnboardingGroup) ||
+      (targetGroup === '(tabs)' && inTabsGroup)
+    ) {
+      setRouteReady(true);
+    } else {
+      setRouteReady(false);
+    }
+  }, [segments, targetGroup]);
+
+  const showSplashOverlay = !isLoaded || isCheckingOnboarding || !splashMinDone || !routeReady;
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(onboarding)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="check-in" options={{ presentation: 'card' }} />
-      <Stack.Screen name="workout" options={{ presentation: 'card' }} />
-      <Stack.Screen name="competition" options={{ presentation: 'card' }} />
-      <Stack.Screen name="history" options={{ presentation: 'card' }} />
-      <Stack.Screen name="trends" options={{ presentation: 'card' }} />
-      <Stack.Screen name="exercises" options={{ presentation: 'card' }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="check-in" options={{ presentation: 'card' }} />
+        <Stack.Screen name="workout" options={{ presentation: 'card' }} />
+        <Stack.Screen name="competition" options={{ presentation: 'card' }} />
+        <Stack.Screen name="history" options={{ presentation: 'card' }} />
+        <Stack.Screen name="trends" options={{ presentation: 'card' }} />
+        <Stack.Screen name="exercises" options={{ presentation: 'card' }} />
+      </Stack>
+      {showSplashOverlay ? <SplashScreen /> : null}
+    </View>
   );
 }
 

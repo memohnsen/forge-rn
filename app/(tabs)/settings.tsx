@@ -82,18 +82,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleStartOnboarding = async () => {
-    if (!userId) return;
-
-    try {
-      await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
-      router.replace('/(onboarding)');
-    } catch (error) {
-      console.error('Error starting onboarding:', error);
-      Alert.alert('Error', 'Unable to start onboarding. Please try again.');
-    }
-  };
-
   useEffect(() => {
     if (userId) {
       fetchUsers(userId);
@@ -140,13 +128,6 @@ export default function SettingsScreen() {
             accentColor="#8C64C8"
             isDark={isDark}
             onPress={() => setShowCoachEmailSheet(true)}
-          />
-          <SettingsRow
-            icon="flag-checkered"
-            title="Redo Onboarding"
-            accentColor="#FFA050"
-            isDark={isDark}
-            onPress={handleStartOnboarding}
           />
           <SettingsRow
             icon="help-circle"
