@@ -95,6 +95,8 @@ export default function ExercisesScreen() {
   const handlePress = (exercise: ExerciseCard) => {
     if (exercise.route === '/exercises/box-breathing') {
       router.push('/exercises/box-breathing');
+    } else if (exercise.route === '/exercises/visualization') {
+      router.push('/exercises/visualization');
     } else if (exercise.route === '/exercises/objective-review') {
       router.push('/exercises/objective-review');
     } else if (exercise.route === '/exercises/external-anchor') {

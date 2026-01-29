@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,11 +20,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RevenueCatUI } from 'react-native-purchases-ui';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { userId, getToken } = useAuth();
   const router = useRouter();
   const { user, fetchUsers, updateCoachEmail } = useHome();
@@ -63,6 +66,15 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => {} },
     ]);
+  };
+
+  const handleCustomerSupport = async () => {
+    try {
+      await RevenueCatUI.presentCustomerCenter();
+    } catch (error) {
+      console.error('Error presenting Customer Center:', error);
+      Alert.alert('Error', 'Unable to open Customer Support. Please try again later.');
+    }
   };
 
   const handleSaveCoachEmail = async (email: string) => {
@@ -111,7 +123,7 @@ export default function SettingsScreen() {
             title="Connected Apps"
             accentColor="#5AB48C"
             isDark={isDark}
-            onPress={() => Alert.alert('Coming soon', 'Connected apps are next.')}
+            onPress={() => router.push('/settings/connected-apps')}
           />
           <SettingsRow
             icon="upload"
@@ -134,7 +146,7 @@ export default function SettingsScreen() {
             title="Customer Support"
             accentColor="#64A0DC"
             isDark={isDark}
-            onPress={() => Alert.alert('Support', 'We will open the support center.')}
+            onPress={handleCustomerSupport}
           />
           <SettingsRow
             icon="message-text"

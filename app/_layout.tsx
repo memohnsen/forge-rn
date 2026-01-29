@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { SplashScreen } from '@/components/SplashScreen';
 import { View } from 'react-native';
+import Purchases from 'react-native-purchases';
 
 const tokenCache = {
   async getToken(key: string) {
