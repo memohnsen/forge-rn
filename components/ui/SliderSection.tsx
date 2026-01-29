@@ -29,18 +29,8 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const getRatingColor = () => {
-    if (inverseColorRating) {
-      if (value <= 2) return colors.scoreGreen;
-      if (value === 3) return colors.scoreYellow;
-      return colors.scoreRed;
-    }
-    if (value >= 4) return colors.scoreGreen;
-    if (value === 3) return colors.scoreYellow;
-    return colors.scoreRed;
-  };
-
-  const ratingColor = getRatingColor();
+  // Always use blueEnergy color for sliders
+  const ratingColor = colors.blueEnergy;
 
   return (
     <View

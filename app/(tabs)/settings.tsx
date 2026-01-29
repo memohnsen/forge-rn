@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId, getToken } = useAuth();
+  const router = useRouter();
   const { user, fetchUsers, updateCoachEmail } = useHome();
 
   const [isExporting, setIsExporting] = useState(false);

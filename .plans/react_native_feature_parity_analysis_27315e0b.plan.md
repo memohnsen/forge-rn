@@ -5,14 +5,11 @@ todos:
   - id: notifications
     content: "Implement notification settings: training schedule management, permission handling, and notification scheduling"
     status: pending
-  - id: connected-apps
-    content: Implement Oura and Whoop OAuth integrations with token management
-    status: pending
-  - id: onboarding
-    content: Create onboarding flow for new users
-    status: pending
   - id: analytics
     content: Set up PostHog analytics integration throughout the app
+    status: pending
+  - id: revenuecat
+    content: Implement RevenueCat pay wall to end of onboarding
     status: pending
 isProject: false
 ---
@@ -52,46 +49,6 @@ The Swift app is the reference implementation with full feature set. The React N
   - `hooks/use-notifications.ts` - Notification state management
   - Training days storage/retrieval from Supabase
   - Integration with `expo-notifications`
-
-#### 2. Exercises Screen
-
-All exercise implementations are missing:
-
-**Box Breathing** (`app/exercises/box-breathing.tsx`)
-
-- Breathing animation/visualization
-- Timer functionality
-- Session tracking
-
-**Visualization** (`app/exercises/visualization.tsx`) ✅ IMPLEMENTED
-
-- Guided visualization flow
-- Audio playback with ElevenLabs TTS
-- Script generation via OpenRouter
-- Voice selection (Matilda, Brian, Daniel)
-- Caching support
-
-#### 3. Trends Screen Enhancements
-
-**Time Frame Selection**
-
-- Already exists but needs:
-  - Persistent storage
-  - Better integration with data fetching
-
-#### 4. Onboarding Flow
-
-**Onboarding Screen** (`app/onboarding.tsx`)
-
-- User profile creation
-- Training days selection
-- Meet information input
-- Sport selection
-- Initial notification permission request
-- Implementation needed:
-  - Multi-step form
-  - Data persistence
-  - Navigation flow
 
 #### 5. Additional Features
 
@@ -135,23 +92,14 @@ All exercise implementations are missing:
 ### High Priority
 
 1. Notification Settings (core functionality)
-2. Connected Apps (Oura/Whoop) - needed for trends data
-3. Export Data (user data portability)
-4. AI Trend Analysis completion
-5. Exercise implementations (especially Objective Review)
 
 ### Medium Priority
 
-6. Auto-Send Results
-7. Onboarding flow
-8. Detailed graph views
-9. Chart selection persistence
 10. Analytics integration
 
 ### Low Priority
 
 11. Widget support
-12. RevenueCat Customer Center
 13. User Profile View
 
 ## Technical Dependencies Needed

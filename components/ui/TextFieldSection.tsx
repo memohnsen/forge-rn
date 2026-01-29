@@ -51,6 +51,7 @@ export const TextFieldSection: React.FC<TextFieldSectionProps> = ({
           {
             backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
             color: isDark ? '#FFFFFF' : '#000000',
+            minHeight: multiline ? 100 : 48,
           },
         ]}
         value={value}
@@ -100,6 +101,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     fontSize: 16,
-    minHeight: 100,
   },
 });
