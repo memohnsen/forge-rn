@@ -14,6 +14,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   useColorScheme,
@@ -25,7 +26,8 @@ import { textToSpeech, VOICES, VoiceOption } from '@/services/elevenlabs';
 import { queryOpenRouter } from '@/services/openrouter';
 import { createClerkSupabaseClient } from '@/services/supabase';
 
-const BLUE_ENERGY = '#4A90D9';
+const ACCENT_COLOR = '#9966CC'; // Purple to match Swift
+const PLAYER_COLOR = '#4A90D9'; // Blue energy for player (matches Swift PlayerView)
 const CACHE_DIR = `${FileSystem.cacheDirectory}visualizations/`;
 
 type ScreenState = 'setup' | 'generating' | 'player';
@@ -321,55 +323,49 @@ function SetupScreen({
         <View
           style={[
             styles.card,
-            { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: `${BLUE_ENERGY}33` },
+            { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: `${ACCENT_COLOR}33` },
           ]}
         >
           <View style={styles.cardHeader}>
             <LinearGradient
-              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
+              colors={[`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.iconCircle}
             >
-              <MaterialCommunityIcons name="head-snowflake-outline" size={20} color={BLUE_ENERGY} />
+              <MaterialCommunityIcons name="head-snowflake-outline" size={20} color={ACCENT_COLOR} />
             </LinearGradient>
             <View style={styles.cardText}>
               <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                Mental Rehearsal
+                Visualization
               </Text>
-              <Text style={styles.cardSubtitle}>Personalized guided visualization</Text>
+              <Text style={styles.cardSubtitle}>Mental rehearsal</Text>
             </View>
           </View>
           <Text style={styles.cardDescription}>
-            Create a custom visualization script tailored to your movement and cues.
-            Listen to it before training or competition to mentally rehearse success.
+            Describe your movement and cues. A personalized guided visualization will help you mentally prepare.
           </Text>
         </View>
 
         {/* Movement Input */}
         <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
           <View style={styles.inputHeader}>
-            <LinearGradient
-              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.inputIcon}
-            >
-              <MaterialCommunityIcons name="weight-lifter" size={16} color={BLUE_ENERGY} />
-            </LinearGradient>
+            <MaterialCommunityIcons name="dumbbell" size={16} color={ACCENT_COLOR} />
             <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
-              Movement / Weight
+              Movement & Weight
             </Text>
           </View>
           <TextInput
             style={[
               styles.textInput,
               {
-                backgroundColor: isDark ? '#0D0D0D' : '#F5F5F5',
+                backgroundColor: isDark ? `${ACCENT_COLOR}14` : `${ACCENT_COLOR}14`,
                 color: isDark ? '#FFF' : '#000',
+                borderColor: `${ACCENT_COLOR}26`,
+                borderWidth: 1,
               },
             ]}
-            placeholder="e.g., 200kg Squat, 150kg Bench Press"
+            placeholder="e.g., 200kg Squat, 100kg Snatch"
             placeholderTextColor="#666"
             value={movement}
             onChangeText={setMovement}
@@ -379,14 +375,7 @@ function SetupScreen({
         {/* Cues Input */}
         <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
           <View style={styles.inputHeader}>
-            <LinearGradient
-              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.inputIcon}
-            >
-              <MaterialCommunityIcons name="format-list-bulleted" size={16} color={BLUE_ENERGY} />
-            </LinearGradient>
+            <MaterialCommunityIcons name="target" size={16} color={ACCENT_COLOR} />
             <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
               Focus Cues
             </Text>
@@ -395,8 +384,10 @@ function SetupScreen({
             style={[
               styles.textInputMultiline,
               {
-                backgroundColor: isDark ? '#0D0D0D' : '#F5F5F5',
+                backgroundColor: `${ACCENT_COLOR}14`,
                 color: isDark ? '#FFF' : '#000',
+                borderColor: `${ACCENT_COLOR}26`,
+                borderWidth: 1,
               },
             ]}
             placeholder="Enter your personal cues and focus points..."
@@ -412,91 +403,94 @@ function SetupScreen({
         {/* Voice Selection */}
         <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
           <View style={styles.inputHeader}>
-            <LinearGradient
-              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.inputIcon}
-            >
-              <MaterialCommunityIcons name="account-voice" size={16} color={BLUE_ENERGY} />
-            </LinearGradient>
+            <MaterialCommunityIcons name="waveform" size={16} color={ACCENT_COLOR} />
             <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
               Voice
             </Text>
           </View>
           <View style={styles.voiceOptions}>
-            {VOICES.map((voice) => (
-              <Pressable
-                key={voice.id}
-                onPress={() => setSelectedVoice(voice)}
-                style={[
-                  styles.voiceOption,
-                  {
-                    backgroundColor:
-                      selectedVoice.id === voice.id
-                        ? BLUE_ENERGY
-                        : isDark
-                        ? '#0D0D0D'
-                        : '#F5F5F5',
-                    borderColor:
-                      selectedVoice.id === voice.id ? BLUE_ENERGY : 'transparent',
-                  },
-                ]}
-              >
-                <Text
+            {VOICES.map((voice) => {
+              const isSelected = selectedVoice.id === voice.id;
+              return (
+                <Pressable
+                  key={voice.id}
+                  onPress={() => setSelectedVoice(voice)}
                   style={[
-                    styles.voiceName,
+                    styles.voiceOption,
                     {
-                      color: selectedVoice.id === voice.id ? '#FFF' : isDark ? '#FFF' : '#000',
+                      backgroundColor: isSelected ? `${ACCENT_COLOR}14` : 'transparent',
+                      borderColor: isSelected ? `${ACCENT_COLOR}4D` : isDark ? '#333' : '#E5E5E5',
+                      borderWidth: isSelected ? 2 : 1,
                     },
                   ]}
                 >
-                  {voice.name}
-                </Text>
-                <Text
-                  style={[
-                    styles.voiceDescription,
-                    {
-                      color:
-                        selectedVoice.id === voice.id
-                          ? 'rgba(255,255,255,0.8)'
-                          : '#666',
-                    },
-                  ]}
-                >
-                  {voice.description}
-                </Text>
-              </Pressable>
-            ))}
+                  <LinearGradient
+                    colors={
+                      isSelected
+                        ? [`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]
+                        : [isDark ? '#333' : '#F0F0F0', isDark ? '#222' : '#E8E8E8']
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.voiceIconCircle}
+                  >
+                    <MaterialCommunityIcons
+                      name="account-voice"
+                      size={18}
+                      color={isSelected ? ACCENT_COLOR : '#888'}
+                    />
+                  </LinearGradient>
+                  <Text
+                    style={[
+                      styles.voiceName,
+                      {
+                        color: isSelected ? ACCENT_COLOR : isDark ? '#FFF' : '#000',
+                      },
+                    ]}
+                  >
+                    {voice.name}
+                  </Text>
+                  <Text style={styles.voiceDescription}>{voice.description}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
         {/* Cached Version Toggle */}
         {hasCachedVersion && (
-          <Pressable
-            onPress={() => setUseCachedVersion(!useCachedVersion)}
+          <View
             style={[
               styles.cachedToggle,
               {
                 backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                borderColor: useCachedVersion ? BLUE_ENERGY : 'transparent',
+                borderColor: '#34C75933',
               },
             ]}
           >
-            <MaterialCommunityIcons
-              name={useCachedVersion ? 'checkbox-marked' : 'checkbox-blank-outline'}
-              size={24}
-              color={useCachedVersion ? BLUE_ENERGY : '#666'}
-            />
+            <LinearGradient
+              colors={['#34C75940', '#34C7591A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cachedIcon}
+            >
+              <MaterialCommunityIcons name="download-circle" size={16} color="#34C759" />
+            </LinearGradient>
             <View style={styles.cachedToggleText}>
               <Text style={[styles.cachedToggleTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                Use Saved Version
+                Saved Version Available
               </Text>
               <Text style={styles.cachedToggleSubtitle}>
-                Skip generation and use previously created audio
+                Play without using API credits
               </Text>
             </View>
-          </Pressable>
+            <Switch
+              value={useCachedVersion}
+              onValueChange={setUseCachedVersion}
+              trackColor={{ false: isDark ? '#333' : '#E5E5E5', true: '#34C759' }}
+              thumbColor="#FFF"
+            />
+          </View>
         )}
 
         {/* Generate Button */}
@@ -506,18 +500,14 @@ function SetupScreen({
           style={[styles.generateButton, { opacity: canGenerate ? 1 : 0.5 }]}
         >
           <LinearGradient
-            colors={[BLUE_ENERGY, `${BLUE_ENERGY}D9`]}
+            colors={canGenerate ? [ACCENT_COLOR, `${ACCENT_COLOR}D9`] : ['#888', '#666']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.generateButtonGradient}
           >
-            <MaterialCommunityIcons
-              name={useCachedVersion ? 'play' : 'creation'}
-              size={20}
-              color="#FFF"
-            />
+            <MaterialCommunityIcons name="waveform" size={18} color="#FFF" />
             <Text style={styles.generateButtonText}>
-              {useCachedVersion ? 'Play Visualization' : 'Generate Visualization'}
+              {useCachedVersion ? 'Play Saved Visualization' : 'Generate Visualization'}
             </Text>
           </LinearGradient>
         </Pressable>
@@ -536,59 +526,48 @@ function GeneratingScreen({
   insets: { top: number; bottom: number };
   isGeneratingScript: boolean;
 }) {
-  const pulseAnim = useRef(new Animated.Value(0.6)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.6,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
   return (
     <View style={[styles.generatingContainer, { paddingTop: insets.top }]}>
       <View style={styles.generatingContent}>
-        <Animated.View
-          style={[
-            styles.generatingCircle,
-            {
-              backgroundColor: BLUE_ENERGY,
-              transform: [{ scale: pulseAnim }],
-              opacity: pulseAnim,
-            },
-          ]}
+        <LinearGradient
+          colors={[`${ACCENT_COLOR}33`, `${ACCENT_COLOR}0D`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.generatingCircle}
         >
-          <MaterialCommunityIcons
-            name={isGeneratingScript ? 'script-text-outline' : 'microphone'}
-            size={48}
-            color="#FFF"
-          />
-        </Animated.View>
+          <ActivityIndicator size="large" color={ACCENT_COLOR} />
+        </LinearGradient>
 
         <Text style={[styles.generatingTitle, { color: isDark ? '#FFF' : '#000' }]}>
+          Creating Visualization
+        </Text>
+        <Text style={[styles.generatingSubtitle, { color: ACCENT_COLOR }]}>
           {isGeneratingScript ? 'Generating Script...' : 'Creating Audio...'}
         </Text>
-        <Text style={styles.generatingSubtitle}>
-          {isGeneratingScript
-            ? 'Crafting your personalized visualization'
-            : 'Converting script to speech'}
-        </Text>
 
-        <ActivityIndicator size="large" color={BLUE_ENERGY} style={{ marginTop: 24 }} />
-
-        <View style={styles.warningContainer}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#FF9500" />
-          <Text style={styles.warningText}>Please do not leave this page</Text>
+        {/* Warning Card */}
+        <View
+          style={[
+            styles.warningCard,
+            { backgroundColor: isDark ? 'rgba(255, 149, 0, 0.15)' : 'rgba(255, 149, 0, 0.1)' },
+          ]}
+        >
+          <View style={styles.warningHeader}>
+            <LinearGradient
+              colors={['#FF950040', '#FF95001A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.warningIcon}
+            >
+              <MaterialCommunityIcons name="alert" size={14} color="#FF9500" />
+            </LinearGradient>
+            <Text style={[styles.warningTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Please do not leave this page
+            </Text>
+          </View>
+          <Text style={styles.warningDescription}>
+            The visualization is being generated. Leaving the page may interrupt the process.
+          </Text>
         </View>
       </View>
     </View>
@@ -761,7 +740,7 @@ function PlayerScreen({
                 width: 200 + index * 50,
                 height: 200 + index * 50,
                 borderRadius: (200 + index * 50) / 2,
-                borderColor: BLUE_ENERGY,
+                borderColor: PLAYER_COLOR,
                 opacity: glowAnim.interpolate({
                   inputRange: [0.4, 0.8],
                   outputRange: [0.15 - index * 0.04, 0.25 - index * 0.04],
@@ -776,7 +755,7 @@ function PlayerScreen({
         <Pressable onPress={togglePlayback}>
           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <LinearGradient
-              colors={['#66A3D9', BLUE_ENERGY, '#3366A3']}
+              colors={['#66A3D9', PLAYER_COLOR, '#3366A3']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.centerCircle}
@@ -803,7 +782,7 @@ function PlayerScreen({
           maximumValue={1}
           value={progress}
           onSlidingComplete={seekTo}
-          minimumTrackTintColor={BLUE_ENERGY}
+          minimumTrackTintColor={PLAYER_COLOR}
           maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
           thumbTintColor="#FFF"
         />
@@ -819,7 +798,7 @@ function PlayerScreen({
           <MaterialCommunityIcons
             name={isPlaying ? 'pause-circle' : 'play-circle'}
             size={70}
-            color={BLUE_ENERGY}
+            color={PLAYER_COLOR}
           />
         </Pressable>
 
@@ -830,14 +809,14 @@ function PlayerScreen({
 
       {/* View Script Button */}
       <Pressable onPress={() => setShowScript(true)} style={styles.viewScriptButton}>
-        <MaterialCommunityIcons name="file-document-outline" size={18} color={BLUE_ENERGY} />
-        <Text style={[styles.viewScriptText, { color: BLUE_ENERGY }]}>View Script</Text>
+        <MaterialCommunityIcons name="file-document-outline" size={18} color={PLAYER_COLOR} />
+        <Text style={[styles.viewScriptText, { color: PLAYER_COLOR }]}>View Script</Text>
       </Pressable>
 
       {/* Done Button */}
       <Pressable onPress={handleDone} style={styles.doneButton}>
         <LinearGradient
-          colors={[BLUE_ENERGY, `${BLUE_ENERGY}D9`]}
+          colors={[PLAYER_COLOR, `${PLAYER_COLOR}D9`]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.doneButtonGradient}
@@ -860,7 +839,7 @@ function PlayerScreen({
               Visualization Script
             </Text>
             <Pressable onPress={() => setShowScript(false)}>
-              <Text style={[styles.modalDone, { color: BLUE_ENERGY }]}>Done</Text>
+              <Text style={[styles.modalDone, { color: PLAYER_COLOR }]}>Done</Text>
             </Pressable>
           </View>
           <ScrollView
@@ -973,11 +952,11 @@ const styles = StyleSheet.create({
   },
   voiceOption: {
     flex: 1,
-    padding: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 14,
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 2,
+    gap: 2,
   },
   voiceName: {
     fontSize: 14,
@@ -985,6 +964,22 @@ const styles = StyleSheet.create({
   },
   voiceDescription: {
     fontSize: 11,
+    color: '#888',
+  },
+  voiceIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cachedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cachedToggle: {
     flexDirection: 'row',
@@ -1049,7 +1044,37 @@ const styles = StyleSheet.create({
   },
   generatingSubtitle: {
     fontSize: 15,
-    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  warningCard: {
+    marginTop: 32,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF950033',
+    gap: 10,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  warningIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  warningTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  warningDescription: {
+    fontSize: 12,
+    color: '#888',
     textAlign: 'center',
   },
   warningContainer: {
@@ -1096,7 +1121,7 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: BLUE_ENERGY,
+    shadowColor: PLAYER_COLOR,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 30,

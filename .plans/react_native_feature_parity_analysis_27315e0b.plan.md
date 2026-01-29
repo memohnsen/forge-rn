@@ -8,9 +8,6 @@ todos:
   - id: connected-apps
     content: Implement Oura and Whoop OAuth integrations with token management
     status: pending
-  - id: visualization
-    content: "Visualization exercise implementation"
-    status: pending
   - id: onboarding
     content: Create onboarding flow for new users
     status: pending
@@ -114,11 +111,13 @@ All exercise implementations are missing:
 - Timer functionality
 - Session tracking
 
-**Visualization** (`app/exercises/visualization.tsx`)
+**Visualization** (`app/exercises/visualization.tsx`) ✅ IMPLEMENTED
 
 - Guided visualization flow
-- Audio playback (optional)
-- Session tracking
+- Audio playback with ElevenLabs TTS
+- Script generation via OpenRouter
+- Voice selection (Matilda, Brian, Daniel)
+- Caching support
 
 **Objective Review** (`app/exercises/objective-review.tsx`)
 
