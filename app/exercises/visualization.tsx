@@ -1,0 +1,1195 @@
+import { useAuth } from '@clerk/clerk-expo';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Slider from '@react-native-community/slider';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { textToSpeech, VOICES, VoiceOption } from '@/services/elevenlabs';
+import { queryOpenRouter } from '@/services/openrouter';
+import { createClerkSupabaseClient } from '@/services/supabase';
+
+const BLUE_ENERGY = '#4A90D9';
+const CACHE_DIR = `${FileSystem.cacheDirectory}visualizations/`;
+
+type ScreenState = 'setup' | 'generating' | 'player';
+
+export default function VisualizationScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+  const { userId, getToken } = useAuth();
+
+  const [screenState, setScreenState] = useState<ScreenState>('setup');
+  const [movement, setMovement] = useState('');
+  const [cues, setCues] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState<VoiceOption>(VOICES[0]);
+  const [userSport, setUserSport] = useState('athlete');
+
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [generatedScript, setGeneratedScript] = useState('');
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+
+  const [hasCachedVersion, setHasCachedVersion] = useState(false);
+  const [useCachedVersion, setUseCachedVersion] = useState(false);
+
+  const canGenerate =
+    movement.trim().length > 0 && cues.trim().length > 0;
+
+  // Load user sport from Supabase
+  useEffect(() => {
+    async function loadUserSport() {
+      if (!userId) return;
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (!token) return;
+        const supabase = createClerkSupabaseClient(() => Promise.resolve(token));
+        const { data } = await supabase
+          .from('journal_users')
+          .select('sport')
+          .eq('user_id', userId)
+          .single();
+        if (data?.sport) {
+          setUserSport(data.sport);
+        }
+      } catch (error) {
+        console.log('Failed to load user sport:', error);
+      }
+    }
+    loadUserSport();
+  }, [userId, getToken]);
+
+  // Check for cached version when inputs change
+  useEffect(() => {
+    async function checkCache() {
+      const key = getCacheKey(movement, cues, selectedVoice.id);
+      const audioPath = `${CACHE_DIR}${key}.mp3`;
+      const info = await FileSystem.getInfoAsync(audioPath);
+      setHasCachedVersion(info.exists);
+      if (!info.exists) {
+        setUseCachedVersion(false);
+      }
+    }
+    if (movement && cues) {
+      checkCache();
+    } else {
+      setHasCachedVersion(false);
+      setUseCachedVersion(false);
+    }
+  }, [movement, cues, selectedVoice]);
+
+  function getCacheKey(mov: string, c: string, voiceId: string): string {
+    const combined = `${mov}_${c}_${voiceId}`;
+    // Simple hash - base64 encode and clean up
+    const hash = btoa(combined)
+      .replace(/\//g, '_')
+      .replace(/\+/g, '-')
+      .slice(0, 50);
+    return hash;
+  }
+
+  async function ensureCacheDir() {
+    const info = await FileSystem.getInfoAsync(CACHE_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
+    }
+  }
+
+  function buildVisualizationPrompt(): string {
+    return `You are a professional ${userSport} coach creating a guided visualization script for an athlete preparing for a movement.
+
+The athlete wants to visualize: ${movement}
+Their personal cues to focus on: ${cues}
+
+Create a calming, focused visualization script that:
+1. Starts by having them close their eyes and take deep breaths
+2. Guides them to visualize approaching and setting up for the movement
+3. Walks through the setup phase incorporating their specific cues
+4. Describes the execution with vivid sensory detail
+5. Emphasizes feeling strong, confident, and in control
+6. Ends with successfully completing the movement and the feeling of accomplishment
+
+Tone:
+- Sound confident, but not robotic. Remember you're speaking to a person.
+
+IMPORTANT FORMATTING RULES:
+- Include <break time="3.0s" /> tags between major steps to give the athlete time to visualize
+- Use <break time="2.0s" /> for shorter pauses between sentences within a section
+- Use <break time="1.0s" /> for brief pauses for emphasis
+- Keep the total script around 2-3 minutes when read aloud
+- Use second person ("you") to speak directly to the athlete
+- Keep sentences short and easy to follow
+- Use a calm, confident, encouraging tone
+
+Example pacing:
+"Close your eyes and take a deep breath in... <break time="2.0s" /> And slowly release. <break time="2.0s" /> Feel your body becoming calm and focused. <break time="3.0s" />"
+
+Generate only the script text, no titles or headers. Start directly with the visualization guidance.`;
+  }
+
+  async function handleGenerate() {
+    const key = getCacheKey(movement, cues, selectedVoice.id);
+    const audioPath = `${CACHE_DIR}${key}.mp3`;
+    const scriptPath = `${CACHE_DIR}${key}.txt`;
+
+    // Check if using cached version
+    if (useCachedVersion) {
+      const audioInfo = await FileSystem.getInfoAsync(audioPath);
+      if (audioInfo.exists) {
+        try {
+          const cachedScript = await FileSystem.readAsStringAsync(scriptPath);
+          setGeneratedScript(cachedScript);
+        } catch {
+          setGeneratedScript('');
+        }
+        setAudioUri(audioPath);
+        setScreenState('player');
+        return;
+      }
+    }
+
+    setScreenState('generating');
+    setIsGeneratingScript(true);
+
+    try {
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Generate script
+      const prompt = buildVisualizationPrompt();
+      const script = await queryOpenRouter({ prompt, token });
+      setGeneratedScript(script);
+      setIsGeneratingScript(false);
+
+      // Generate audio
+      const audioData = await textToSpeech({
+        text: script,
+        voiceId: selectedVoice.id,
+        token,
+        stability: 0.6,
+        similarityBoost: 0.8,
+      });
+
+      // Save to cache
+      await ensureCacheDir();
+      const audioBase64 = arrayBufferToBase64(audioData);
+      await FileSystem.writeAsStringAsync(audioPath, audioBase64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await FileSystem.writeAsStringAsync(scriptPath, script);
+
+      setAudioUri(audioPath);
+      setScreenState('player');
+    } catch (error) {
+      console.error('Generation error:', error);
+      Alert.alert(
+        'Generation Failed',
+        error instanceof Error ? error.message : 'Failed to generate visualization. Please try again.',
+        [{ text: 'OK', onPress: () => setScreenState('setup') }]
+      );
+    }
+  }
+
+  function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  function handlePlayerComplete() {
+    setScreenState('setup');
+    setAudioUri(null);
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+      {screenState === 'setup' && (
+        <SetupScreen
+          isDark={isDark}
+          insets={insets}
+          movement={movement}
+          setMovement={setMovement}
+          cues={cues}
+          setCues={setCues}
+          selectedVoice={selectedVoice}
+          setSelectedVoice={setSelectedVoice}
+          hasCachedVersion={hasCachedVersion}
+          useCachedVersion={useCachedVersion}
+          setUseCachedVersion={setUseCachedVersion}
+          canGenerate={canGenerate}
+          onGenerate={handleGenerate}
+        />
+      )}
+
+      {screenState === 'generating' && (
+        <GeneratingScreen
+          isDark={isDark}
+          insets={insets}
+          isGeneratingScript={isGeneratingScript}
+        />
+      )}
+
+      {screenState === 'player' && audioUri && (
+        <PlayerScreen
+          isDark={isDark}
+          insets={insets}
+          audioUri={audioUri}
+          script={generatedScript}
+          movement={movement}
+          onComplete={handlePlayerComplete}
+        />
+      )}
+    </View>
+  );
+}
+
+// Setup Screen Component
+function SetupScreen({
+  isDark,
+  insets,
+  movement,
+  setMovement,
+  cues,
+  setCues,
+  selectedVoice,
+  setSelectedVoice,
+  hasCachedVersion,
+  useCachedVersion,
+  setUseCachedVersion,
+  canGenerate,
+  onGenerate,
+}: {
+  isDark: boolean;
+  insets: { top: number; bottom: number };
+  movement: string;
+  setMovement: (v: string) => void;
+  cues: string;
+  setCues: (v: string) => void;
+  selectedVoice: VoiceOption;
+  setSelectedVoice: (v: VoiceOption) => void;
+  hasCachedVersion: boolean;
+  useCachedVersion: boolean;
+  setUseCachedVersion: (v: boolean) => void;
+  canGenerate: boolean;
+  onGenerate: () => void;
+}) {
+  return (
+    <>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={24}
+            color={isDark ? '#FFF' : '#000'}
+          />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: isDark ? '#FFF' : '#000' }]}>
+          Visualization
+        </Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Info Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: `${BLUE_ENERGY}33` },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <LinearGradient
+              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconCircle}
+            >
+              <MaterialCommunityIcons name="head-snowflake-outline" size={20} color={BLUE_ENERGY} />
+            </LinearGradient>
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                Mental Rehearsal
+              </Text>
+              <Text style={styles.cardSubtitle}>Personalized guided visualization</Text>
+            </View>
+          </View>
+          <Text style={styles.cardDescription}>
+            Create a custom visualization script tailored to your movement and cues.
+            Listen to it before training or competition to mentally rehearse success.
+          </Text>
+        </View>
+
+        {/* Movement Input */}
+        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+          <View style={styles.inputHeader}>
+            <LinearGradient
+              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inputIcon}
+            >
+              <MaterialCommunityIcons name="weight-lifter" size={16} color={BLUE_ENERGY} />
+            </LinearGradient>
+            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Movement / Weight
+            </Text>
+          </View>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: isDark ? '#0D0D0D' : '#F5F5F5',
+                color: isDark ? '#FFF' : '#000',
+              },
+            ]}
+            placeholder="e.g., 200kg Squat, 150kg Bench Press"
+            placeholderTextColor="#666"
+            value={movement}
+            onChangeText={setMovement}
+          />
+        </View>
+
+        {/* Cues Input */}
+        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+          <View style={styles.inputHeader}>
+            <LinearGradient
+              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inputIcon}
+            >
+              <MaterialCommunityIcons name="format-list-bulleted" size={16} color={BLUE_ENERGY} />
+            </LinearGradient>
+            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Focus Cues
+            </Text>
+          </View>
+          <TextInput
+            style={[
+              styles.textInputMultiline,
+              {
+                backgroundColor: isDark ? '#0D0D0D' : '#F5F5F5',
+                color: isDark ? '#FFF' : '#000',
+              },
+            ]}
+            placeholder="Enter your personal cues and focus points..."
+            placeholderTextColor="#666"
+            value={cues}
+            onChangeText={setCues}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Voice Selection */}
+        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+          <View style={styles.inputHeader}>
+            <LinearGradient
+              colors={[`${BLUE_ENERGY}40`, `${BLUE_ENERGY}1A`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inputIcon}
+            >
+              <MaterialCommunityIcons name="account-voice" size={16} color={BLUE_ENERGY} />
+            </LinearGradient>
+            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Voice
+            </Text>
+          </View>
+          <View style={styles.voiceOptions}>
+            {VOICES.map((voice) => (
+              <Pressable
+                key={voice.id}
+                onPress={() => setSelectedVoice(voice)}
+                style={[
+                  styles.voiceOption,
+                  {
+                    backgroundColor:
+                      selectedVoice.id === voice.id
+                        ? BLUE_ENERGY
+                        : isDark
+                        ? '#0D0D0D'
+                        : '#F5F5F5',
+                    borderColor:
+                      selectedVoice.id === voice.id ? BLUE_ENERGY : 'transparent',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.voiceName,
+                    {
+                      color: selectedVoice.id === voice.id ? '#FFF' : isDark ? '#FFF' : '#000',
+                    },
+                  ]}
+                >
+                  {voice.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.voiceDescription,
+                    {
+                      color:
+                        selectedVoice.id === voice.id
+                          ? 'rgba(255,255,255,0.8)'
+                          : '#666',
+                    },
+                  ]}
+                >
+                  {voice.description}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Cached Version Toggle */}
+        {hasCachedVersion && (
+          <Pressable
+            onPress={() => setUseCachedVersion(!useCachedVersion)}
+            style={[
+              styles.cachedToggle,
+              {
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                borderColor: useCachedVersion ? BLUE_ENERGY : 'transparent',
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={useCachedVersion ? 'checkbox-marked' : 'checkbox-blank-outline'}
+              size={24}
+              color={useCachedVersion ? BLUE_ENERGY : '#666'}
+            />
+            <View style={styles.cachedToggleText}>
+              <Text style={[styles.cachedToggleTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                Use Saved Version
+              </Text>
+              <Text style={styles.cachedToggleSubtitle}>
+                Skip generation and use previously created audio
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
+        {/* Generate Button */}
+        <Pressable
+          onPress={onGenerate}
+          disabled={!canGenerate}
+          style={[styles.generateButton, { opacity: canGenerate ? 1 : 0.5 }]}
+        >
+          <LinearGradient
+            colors={[BLUE_ENERGY, `${BLUE_ENERGY}D9`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.generateButtonGradient}
+          >
+            <MaterialCommunityIcons
+              name={useCachedVersion ? 'play' : 'creation'}
+              size={20}
+              color="#FFF"
+            />
+            <Text style={styles.generateButtonText}>
+              {useCachedVersion ? 'Play Visualization' : 'Generate Visualization'}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      </ScrollView>
+    </>
+  );
+}
+
+// Generating Screen Component
+function GeneratingScreen({
+  isDark,
+  insets,
+  isGeneratingScript,
+}: {
+  isDark: boolean;
+  insets: { top: number; bottom: number };
+  isGeneratingScript: boolean;
+}) {
+  const pulseAnim = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.6,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={[styles.generatingContainer, { paddingTop: insets.top }]}>
+      <View style={styles.generatingContent}>
+        <Animated.View
+          style={[
+            styles.generatingCircle,
+            {
+              backgroundColor: BLUE_ENERGY,
+              transform: [{ scale: pulseAnim }],
+              opacity: pulseAnim,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={isGeneratingScript ? 'script-text-outline' : 'microphone'}
+            size={48}
+            color="#FFF"
+          />
+        </Animated.View>
+
+        <Text style={[styles.generatingTitle, { color: isDark ? '#FFF' : '#000' }]}>
+          {isGeneratingScript ? 'Generating Script...' : 'Creating Audio...'}
+        </Text>
+        <Text style={styles.generatingSubtitle}>
+          {isGeneratingScript
+            ? 'Crafting your personalized visualization'
+            : 'Converting script to speech'}
+        </Text>
+
+        <ActivityIndicator size="large" color={BLUE_ENERGY} style={{ marginTop: 24 }} />
+
+        <View style={styles.warningContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#FF9500" />
+          <Text style={styles.warningText}>Please do not leave this page</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Player Screen Component
+function PlayerScreen({
+  isDark,
+  insets,
+  audioUri,
+  script,
+  movement,
+  onComplete,
+}: {
+  isDark: boolean;
+  insets: { top: number; bottom: number };
+  audioUri: string;
+  script: string;
+  movement: string;
+  onComplete: () => void;
+}) {
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [position, setPosition] = useState(0);
+  const [showScript, setShowScript] = useState(false);
+
+  const glowAnim = useRef(new Animated.Value(0.4)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    setupAudio();
+    startGlowAnimation();
+
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isPlaying) {
+      Animated.timing(scaleAnim, {
+        toValue: 1.1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isPlaying]);
+
+  function startGlowAnimation() {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 0.8,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0.4,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }
+
+  async function setupAudio() {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate
+      );
+
+      setSound(newSound);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Audio setup error:', error);
+      Alert.alert('Audio Error', 'Failed to load audio. Please try again.');
+    }
+  }
+
+  function onPlaybackStatusUpdate(status: any) {
+    if (status.isLoaded) {
+      setDuration(status.durationMillis || 0);
+      setPosition(status.positionMillis || 0);
+      setIsPlaying(status.isPlaying);
+
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+      }
+    }
+  }
+
+  async function togglePlayback() {
+    if (!sound) return;
+
+    if (isPlaying) {
+      await sound.pauseAsync();
+    } else {
+      await sound.playAsync();
+    }
+  }
+
+  async function seekRelative(seconds: number) {
+    if (!sound) return;
+    const newPosition = Math.max(0, Math.min(duration, position + seconds * 1000));
+    await sound.setPositionAsync(newPosition);
+  }
+
+  async function seekTo(value: number) {
+    if (!sound) return;
+    const newPosition = value * duration;
+    await sound.setPositionAsync(newPosition);
+  }
+
+  function formatTime(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  function cleanScript(text: string): string {
+    return text.replace(/<break\s+time="[^"]*"\s*\/>/g, '\n\n');
+  }
+
+  async function handleDone() {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+    }
+    onComplete();
+  }
+
+  const progress = duration > 0 ? position / duration : 0;
+
+  return (
+    <View style={[styles.playerContainer, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.playerHeader}>
+        <Text style={[styles.playerTitle, { color: isDark ? '#FFF' : '#000' }]} numberOfLines={1}>
+          {movement}
+        </Text>
+      </View>
+
+      {/* Visualization Animation */}
+      <View style={styles.visualizationContainer}>
+        {/* Glow rings */}
+        {[0, 1, 2].map((index) => (
+          <Animated.View
+            key={index}
+            style={[
+              styles.glowRing,
+              {
+                width: 200 + index * 50,
+                height: 200 + index * 50,
+                borderRadius: (200 + index * 50) / 2,
+                borderColor: BLUE_ENERGY,
+                opacity: glowAnim.interpolate({
+                  inputRange: [0.4, 0.8],
+                  outputRange: [0.15 - index * 0.04, 0.25 - index * 0.04],
+                }),
+                transform: [{ scale: scaleAnim }],
+              },
+            ]}
+          />
+        ))}
+
+        {/* Center circle */}
+        <Pressable onPress={togglePlayback}>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <LinearGradient
+              colors={['#66A3D9', BLUE_ENERGY, '#3366A3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.centerCircle}
+            >
+              <MaterialCommunityIcons
+                name={isPlaying ? 'waveform' : 'play'}
+                size={isPlaying ? 50 : 40}
+                color="#FFF"
+              />
+            </LinearGradient>
+          </Animated.View>
+        </Pressable>
+      </View>
+
+      {/* Progress */}
+      <View style={styles.progressContainer}>
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>{formatTime(position)}</Text>
+          <Text style={styles.timeText}>{formatTime(duration)}</Text>
+        </View>
+        <Slider
+          style={styles.progressSlider}
+          minimumValue={0}
+          maximumValue={1}
+          value={progress}
+          onSlidingComplete={seekTo}
+          minimumTrackTintColor={BLUE_ENERGY}
+          maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
+          thumbTintColor="#FFF"
+        />
+      </View>
+
+      {/* Controls */}
+      <View style={styles.controlsRow}>
+        <Pressable onPress={() => seekRelative(-15)} style={styles.seekButton}>
+          <MaterialCommunityIcons name="rewind-15" size={28} color={isDark ? '#FFF' : '#000'} />
+        </Pressable>
+
+        <Pressable onPress={togglePlayback} style={styles.playPauseButton}>
+          <MaterialCommunityIcons
+            name={isPlaying ? 'pause-circle' : 'play-circle'}
+            size={70}
+            color={BLUE_ENERGY}
+          />
+        </Pressable>
+
+        <Pressable onPress={() => seekRelative(15)} style={styles.seekButton}>
+          <MaterialCommunityIcons name="fast-forward-15" size={28} color={isDark ? '#FFF' : '#000'} />
+        </Pressable>
+      </View>
+
+      {/* View Script Button */}
+      <Pressable onPress={() => setShowScript(true)} style={styles.viewScriptButton}>
+        <MaterialCommunityIcons name="file-document-outline" size={18} color={BLUE_ENERGY} />
+        <Text style={[styles.viewScriptText, { color: BLUE_ENERGY }]}>View Script</Text>
+      </Pressable>
+
+      {/* Done Button */}
+      <Pressable onPress={handleDone} style={styles.doneButton}>
+        <LinearGradient
+          colors={[BLUE_ENERGY, `${BLUE_ENERGY}D9`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.doneButtonGradient}
+        >
+          <MaterialCommunityIcons name="check" size={20} color="#FFF" />
+          <Text style={styles.doneButtonText}>Done</Text>
+        </LinearGradient>
+      </Pressable>
+
+      {/* Script Modal */}
+      <Modal
+        visible={showScript}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowScript(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: isDark ? '#000' : '#F5F5F5' }]}>
+          <View style={[styles.modalHeader, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}>
+            <Text style={[styles.modalTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Visualization Script
+            </Text>
+            <Pressable onPress={() => setShowScript(false)}>
+              <Text style={[styles.modalDone, { color: BLUE_ENERGY }]}>Done</Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.scriptScrollView}
+            contentContainerStyle={styles.scriptContent}
+          >
+            <Text style={[styles.scriptText, { color: isDark ? '#FFF' : '#000' }]}>
+              {cleanScript(script)}
+            </Text>
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 120,
+    gap: 16,
+  },
+  card: {
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardText: {
+    flex: 1,
+    gap: 4,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    color: '#999',
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#999',
+    lineHeight: 20,
+  },
+  inputHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  inputIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  textInput: {
+    padding: 14,
+    borderRadius: 12,
+    fontSize: 15,
+  },
+  textInputMultiline: {
+    padding: 14,
+    borderRadius: 12,
+    fontSize: 15,
+    minHeight: 100,
+  },
+  voiceOptions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  voiceOption: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 2,
+  },
+  voiceName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  voiceDescription: {
+    fontSize: 11,
+  },
+  cachedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    borderWidth: 2,
+  },
+  cachedToggleText: {
+    flex: 1,
+    gap: 2,
+  },
+  cachedToggleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cachedToggleSubtitle: {
+    fontSize: 12,
+    color: '#666',
+  },
+  generateButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  generateButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  generateButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+
+  // Generating Screen
+  generatingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  generatingContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  generatingCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  generatingTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  generatingSubtitle: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 149, 0, 0.15)',
+    borderRadius: 12,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#FF9500',
+    fontWeight: '500',
+  },
+
+  // Player Screen
+  playerContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  playerHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  playerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  visualizationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glowRing: {
+    position: 'absolute',
+    borderWidth: 2,
+  },
+  centerCircle: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: BLUE_ENERGY,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 10,
+  },
+  progressContainer: {
+    marginBottom: 20,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+  timeText: {
+    fontSize: 13,
+    color: '#666',
+    fontVariant: ['tabular-nums'],
+  },
+  progressSlider: {
+    width: '100%',
+    height: 40,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 30,
+    marginBottom: 24,
+  },
+  seekButton: {
+    padding: 8,
+  },
+  playPauseButton: {
+    padding: 4,
+  },
+  viewScriptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  viewScriptText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  doneButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 30,
+  },
+  doneButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  doneButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+
+  // Modal
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  modalDone: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  scriptScrollView: {
+    flex: 1,
+  },
+  scriptContent: {
+    padding: 20,
+  },
+  scriptText: {
+    fontSize: 16,
+    lineHeight: 26,
+  },
+});
