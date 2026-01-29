@@ -17,6 +17,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
+import {
+  trackScreenView,
+  trackTrendsFilterChanged,
+  trackTrendsTimeFrameChanged,
+} from '@/utils/analytics';
 
 
 export default function TrendsScreen() {
@@ -34,6 +39,18 @@ export default function TrendsScreen() {
   const [showChartSelection, setShowChartSelection] = useState(false);
   const autoSelectedRef = useRef({ oura: false, whoop: false });
   const hasLoadedChartsRef = useRef(false);
+
+  useEffect(() => {
+    trackScreenView('trends');
+  }, []);
+
+  useEffect(() => {
+    trackTrendsFilterChanged(selectedFilter);
+  }, [selectedFilter]);
+
+  useEffect(() => {
+    trackTrendsTimeFrameChanged(selectedTimeFrame);
+  }, [selectedTimeFrame]);
 
   useEffect(() => {
     let isActive = true;

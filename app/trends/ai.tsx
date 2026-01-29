@@ -15,6 +15,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackAIAnalysisCompleted,
+  trackAIAnalysisRequested,
+  trackScreenView,
+} from '@/utils/analytics';
 
 export default function TrendsAIPage() {
   const colorScheme = useColorScheme();
@@ -28,6 +33,7 @@ export default function TrendsAIPage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const lastPromptRef = useRef<string | null>(null);
+  const hasTrackedScreen = useRef(false);
 
   const hasEnoughData =
     checkIns.length >= 10 || sessionReports.length >= 10 || compReports.length >= 3;
@@ -46,6 +52,7 @@ export default function TrendsAIPage() {
     if (!hasEnoughData || isAiLoading) return;
     if (lastPromptRef.current === aiPrompt && aiResponse) return;
 
+    trackAIAnalysisRequested('trends_ai');
     setIsAiLoading(true);
     setAiError(null);
     try {
@@ -53,9 +60,13 @@ export default function TrendsAIPage() {
       if (!token) {
         throw new Error('Missing authentication token');
       }
-      const response = await queryOpenRouter({ prompt: aiPrompt, token });
+      const response = await queryOpenRouter({ prompt: aiPrompt, token, purpose: 'trends_ai' });
       lastPromptRef.current = aiPrompt;
       setAiResponse(response);
+      trackAIAnalysisCompleted(
+        'trends_ai',
+        checkIns.length + sessionReports.length + compReports.length
+      );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unable to generate AI analysis. Please try again.';
@@ -63,9 +74,22 @@ export default function TrendsAIPage() {
     } finally {
       setIsAiLoading(false);
     }
-  }, [aiPrompt, aiResponse, getToken, hasEnoughData, isAiLoading]);
+  }, [
+    aiPrompt,
+    aiResponse,
+    checkIns.length,
+    sessionReports.length,
+    compReports.length,
+    getToken,
+    hasEnoughData,
+    isAiLoading,
+  ]);
 
   useEffect(() => {
+    if (!hasTrackedScreen.current) {
+      trackScreenView('trends_ai');
+      hasTrackedScreen.current = true;
+    }
     void runAiAnalysis();
   }, [runAiAnalysis]);
 

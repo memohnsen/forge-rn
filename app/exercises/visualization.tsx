@@ -26,6 +26,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { textToSpeech, VoiceOption, VOICES } from '@/services/elevenlabs';
 import { queryOpenRouter } from '@/services/openrouter';
 import { createClerkSupabaseClient } from '@/services/supabase';
+import {
+  trackScreenView,
+  trackVisualizationGenerated,
+  trackVisualizationPlayed,
+  trackVisualizationScriptViewed,
+} from '@/utils/analytics';
 
 const ACCENT_COLOR = '#9966CC'; // Purple to match Swift
 const PLAYER_COLOR = '#4A90D9'; // Blue energy for player (matches Swift PlayerView)
@@ -51,6 +57,7 @@ export default function VisualizationScreen() {
 
   const [hasCachedVersion, setHasCachedVersion] = useState(false);
   const [useCachedVersion, setUseCachedVersion] = useState(false);
+  const hasTrackedScreen = useRef(false);
 
   const canGenerate =
     movement.trim().length > 0 && cues.trim().length > 0;
@@ -77,6 +84,13 @@ export default function VisualizationScreen() {
     }
     loadUserSport();
   }, [userId, getToken]);
+
+  useEffect(() => {
+    if (!hasTrackedScreen.current) {
+      trackScreenView('visualization');
+      hasTrackedScreen.current = true;
+    }
+  }, []);
 
   // Check for cached version when inputs change
   useEffect(() => {
@@ -177,6 +191,14 @@ Generate only the script text, no titles or headers. Start directly with the vis
           setGeneratedScript(cachedScript);
           setAudioUri(audioPath);
           setScreenState('player');
+          trackVisualizationGenerated(
+            movement,
+            cues.length,
+            selectedVoice.name,
+            userSport,
+            true,
+            true
+          );
           return;
         } catch {
           // Script read failed, fall through to regeneration
@@ -196,7 +218,11 @@ Generate only the script text, no titles or headers. Start directly with the vis
 
       // Generate script
       const prompt = buildVisualizationPrompt();
-      const script = await queryOpenRouter({ prompt, token });
+      const script = await queryOpenRouter({
+        prompt,
+        token,
+        purpose: 'visualization_script',
+      });
       setGeneratedScript(script);
       setIsGeneratingScript(false);
 
@@ -219,8 +245,24 @@ Generate only the script text, no titles or headers. Start directly with the vis
 
       setAudioUri(audioPath);
       setScreenState('player');
+      trackVisualizationGenerated(
+        movement,
+        cues.length,
+        selectedVoice.name,
+        userSport,
+        false,
+        true
+      );
     } catch (error) {
       console.error('Generation error:', error);
+      trackVisualizationGenerated(
+        movement,
+        cues.length,
+        selectedVoice.name,
+        userSport,
+        false,
+        false
+      );
       Alert.alert(
         'Generation Failed',
         error instanceof Error ? error.message : 'Failed to generate visualization. Please try again.',
@@ -274,6 +316,7 @@ Generate only the script text, no titles or headers. Start directly with the vis
           audioUri={audioUri}
           script={generatedScript}
           movement={movement}
+          voiceName={selectedVoice.name}
           onComplete={handlePlayerComplete}
         />
       )}
@@ -595,6 +638,7 @@ function PlayerScreen({
   audioUri,
   script,
   movement,
+  voiceName,
   onComplete,
 }: {
   isDark: boolean;
@@ -602,6 +646,7 @@ function PlayerScreen({
   audioUri: string;
   script: string;
   movement: string;
+  voiceName: string;
   onComplete: () => void;
 }) {
   const modalInsets = useSafeAreaInsets();
@@ -610,6 +655,8 @@ function PlayerScreen({
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [showScript, setShowScript] = useState(false);
+  const hasTrackedPlayback = useRef(false);
+  const hasTrackedScriptView = useRef(false);
 
   // Mutable ref to track the Audio.Sound instance for cleanup
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -627,6 +674,13 @@ function PlayerScreen({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (showScript && !hasTrackedScriptView.current) {
+      trackVisualizationScriptViewed(movement);
+      hasTrackedScriptView.current = true;
+    }
+  }, [movement, showScript]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -692,6 +746,11 @@ function PlayerScreen({
 
       if (status.didJustFinish) {
         setIsPlaying(false);
+        if (!hasTrackedPlayback.current) {
+          const playbackDuration = (status.positionMillis ?? duration) / 1000;
+          trackVisualizationPlayed(movement, voiceName, playbackDuration, true);
+          hasTrackedPlayback.current = true;
+        }
       }
     }
   }
@@ -733,6 +792,10 @@ function PlayerScreen({
     if (sound) {
       await sound.stopAsync();
       await sound.unloadAsync();
+    }
+    if (!hasTrackedPlayback.current) {
+      trackVisualizationPlayed(movement, voiceName, position / 1000, false);
+      hasTrackedPlayback.current = true;
     }
     onComplete();
   }

@@ -4,20 +4,20 @@
     "slug": "forge",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "/assets/images/logo.png",
+    "icon": "/assets/images/icon.icon",
     "scheme": "forge",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.memohnsen.forge"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundImage": "/assets/images/logo.png",
-        "monochromeImage": "/assets/images/logo.png"
+        "foregroundImage": "./assets/images/android-icon.png",
+        "backgroundImage": "/assets/images/android-icon.png",
+        "monochromeImage": "/assets/images/android-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

@@ -1,3 +1,5 @@
+import { trackElevenLabsAPICall } from '@/utils/analytics';
+
 export type VoiceOption = {
   id: string;
   name: string;
@@ -51,33 +53,42 @@ export async function textToSpeech({
 }: TextToSpeechParams): Promise<ArrayBuffer> {
   const requestUrl = getEdgeFunctionUrl();
   const processedText = processSSMLBreaks(text);
+  const textLength = text.length;
 
-  const response = await fetch(requestUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      endpoint: `/text-to-speech/${voiceId}`,
+  try {
+    const response = await fetch(requestUrl, {
       method: 'POST',
-      body: {
-        text: processedText,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability,
-          similarity_boost: similarityBoost,
-          style: 0.0,
-          use_speaker_boost: true,
-        },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-    }),
-  });
+      body: JSON.stringify({
+        endpoint: `/text-to-speech/${voiceId}`,
+        method: 'POST',
+        body: {
+          text: processedText,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability,
+            similarity_boost: similarityBoost,
+            style: 0.0,
+            use_speaker_boost: true,
+          },
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ElevenLabs error (${response.status}): ${errorText || 'Unknown error'}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ElevenLabs error (${response.status}): ${errorText || 'Unknown error'}`);
+    }
+
+    const audio = await response.arrayBuffer();
+    trackElevenLabsAPICall(voiceId, textLength, null, true);
+    return audio;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    trackElevenLabsAPICall(voiceId, textLength, null, false, message);
+    throw error;
   }
-
-  return response.arrayBuffer();
 }

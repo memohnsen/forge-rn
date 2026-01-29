@@ -16,6 +16,7 @@ import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/colors';
+import { trackUserSignedIn } from '@/utils/analytics';
 
 export const useWarmUpBrowser = () => {
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        trackUserSignedIn('google');
         router.replace('/(tabs)');
       }
     } catch (err) {
@@ -67,6 +69,7 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+        trackUserSignedIn('apple');
         router.replace('/(tabs)');
       }
     } catch (err) {

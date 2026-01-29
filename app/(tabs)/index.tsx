@@ -23,6 +23,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
 
 // Check for iOS 26+ (iOS 26 = version 26.0)
 const isIOS26OrLater = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 26;
@@ -61,6 +62,10 @@ export default function HomeScreen() {
   const [newMeetName, setNewMeetName] = useState('');
   const [newMeetDate, setNewMeetDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  useEffect(() => {
+    trackScreenView('home');
+  }, []);
 
   // Fetch data on mount
   useEffect(() => {
@@ -136,6 +141,7 @@ export default function HomeScreen() {
     }
 
     await fetchUsers(userId);
+    trackMeetUpdated(newMeetName, formatToISO(newMeetDate));
     setEditMeetSheetShown(false);
   };
 

@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -25,6 +25,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackCheckInDeleted,
+  trackCheckInViewed,
+  trackCompReflectionDeleted,
+  trackCompReflectionViewed,
+  trackContentShared,
+  trackHistoryDeleted,
+  trackHistoryItemViewed,
+  trackScreenView,
+  trackSessionReflectionDeleted,
+  trackSessionReflectionViewed,
+} from '@/utils/analytics';
 
 // Rating color helper
 function getRatingColor(value: number, isInverse: boolean = false): string {
@@ -457,6 +469,7 @@ export default function HistoryDetailsScreen() {
 
   const { checkIn, session, comp, isLoading, deleteItem } = useHistoryDetails(type, numId);
   const { user } = useHome();
+  const hasTrackedView = useRef(false);
 
   const userSport = user?.sport || 'Powerlifting';
 
@@ -480,6 +493,20 @@ export default function HistoryDetailsScreen() {
       return `${c.selected_intensity} ${c.selected_lift}`;
     }
   }, [item, type]);
+
+  useEffect(() => {
+    if (isLoading || !item || hasTrackedView.current) return;
+    trackScreenView('history_detail');
+    trackHistoryItemViewed(type, numId);
+    if (type === 'Check-Ins') {
+      trackCheckInViewed(numId);
+    } else if (type === 'Workouts') {
+      trackSessionReflectionViewed(numId);
+    } else if (type === 'Meets') {
+      trackCompReflectionViewed(numId);
+    }
+    hasTrackedView.current = true;
+  }, [isLoading, item, numId, type]);
 
   const handleShare = async () => {
     let shareText = '';
@@ -516,6 +543,7 @@ Powered By Forge - Performance Journal`;
 
     try {
       await Share.share({ message: shareText });
+      trackContentShared(type, 'share_sheet');
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -525,6 +553,14 @@ Powered By Forge - Performance Journal`;
     const confirmDelete = async () => {
       const success = await deleteItem();
       if (success) {
+        trackHistoryDeleted(type, 1);
+        if (type === 'Check-Ins') {
+          trackCheckInDeleted(numId);
+        } else if (type === 'Workouts') {
+          trackSessionReflectionDeleted(numId);
+        } else if (type === 'Meets') {
+          trackCompReflectionDeleted(numId);
+        }
         router.back();
       }
     };

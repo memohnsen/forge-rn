@@ -1,11 +1,20 @@
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { SplashScreen } from '@/components/SplashScreen';
 import { StyleSheet, View } from 'react-native';
 import Purchases from 'react-native-purchases';
+import { PostHogProvider } from 'posthog-react-native';
+import {
+  identifyUser,
+  posthog,
+  resetAnalytics,
+  trackAppOpened,
+  trackTabSwitched,
+  trackUserSignedOut,
+} from '@/utils/analytics';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -41,6 +50,9 @@ function InitialLayout() {
   const [splashMinDone, setSplashMinDone] = useState(false);
   const [targetGroup, setTargetGroup] = useState<string | null>(null);
   const [routeReady, setRouteReady] = useState(false);
+  const lastTabRef = useRef<string | null>(null);
+  const prevSignedInRef = useRef<boolean | null>(null);
+  const hasTrackedAppOpenRef = useRef(false);
 
   // User-scoped key to prevent cross-account onboarding status leaks
   const getOnboardingKey = useCallback(
@@ -126,6 +138,13 @@ function InitialLayout() {
     }
   }, [isSignedIn, userId, checkOnboardingStatus, checkPreAuthOnboardingStatus]);
 
+  useEffect(() => {
+    if (!hasTrackedAppOpenRef.current) {
+      trackAppOpened(false);
+      hasTrackedAppOpenRef.current = true;
+    }
+  }, []);
+
   // Keep splash visible for at least 2 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -187,6 +206,34 @@ function InitialLayout() {
     }
   }, [segments, targetGroup]);
 
+  useEffect(() => {
+    if (!isLoaded) return;
+    const previous = prevSignedInRef.current;
+    if (previous === null) {
+      prevSignedInRef.current = isSignedIn;
+    } else if (previous !== isSignedIn) {
+      if (isSignedIn) {
+        identifyUser(userId ?? undefined);
+      } else {
+        trackUserSignedOut();
+        resetAnalytics();
+      }
+      prevSignedInRef.current = isSignedIn;
+    } else if (isSignedIn && userId) {
+      identifyUser(userId);
+    }
+  }, [isLoaded, isSignedIn, userId]);
+
+  useEffect(() => {
+    if (segments[0] !== '(tabs)') return;
+    const currentTab = segments[1] ?? 'index';
+    const previousTab = lastTabRef.current;
+    if (previousTab && previousTab !== currentTab) {
+      trackTabSwitched(previousTab, currentTab);
+    }
+    lastTabRef.current = currentTab;
+  }, [segments]);
+
   const showSplashOverlay = !isLoaded || isCheckingOnboarding || !splashMinDone || !routeReady;
 
   return (
@@ -212,13 +259,19 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
-  return (
+  const content = (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
       <ClerkLoaded>
         <InitialLayout />
       </ClerkLoaded>
     </ClerkProvider>
   );
+
+  if (!posthog) {
+    return content;
+  }
+
+  return <PostHogProvider client={posthog}>{content}</PostHogProvider>;
 }
 
 const styles = StyleSheet.create({

@@ -4,7 +4,7 @@ import { createClerkSupabaseClient } from '@/services/supabase';
 import { useAuth } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackMentalExerciseCompleted,
+  trackMentalExerciseStarted,
+  trackScreenView,
+} from '@/utils/analytics';
 
 type ReviewState = 'vent' | 'processing' | 'reframed';
 
@@ -39,6 +44,12 @@ export default function ObjectiveReviewScreen() {
   const [historyReviews, setHistoryReviews] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [expandedReviewId, setExpandedReviewId] = useState<number | null>(null);
+  const exerciseStartRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    trackScreenView('objective_review');
+    trackMentalExerciseStarted('objective_review');
+  }, []);
 
   // Fetch user's sport on mount
   useEffect(() => {
@@ -105,7 +116,11 @@ Response Format:
     - Do not include any greetings, get straight to the data
     - Write as plain text, no markdown`;
 
-      const response = await queryOpenRouter({ prompt, token });
+      const response = await queryOpenRouter({
+        prompt,
+        token,
+        purpose: 'objective_review',
+      });
       setReframedText(response);
       setCurrentState('reframed');
     } catch (err) {
@@ -153,6 +168,8 @@ Response Format:
           },
         },
       ]);
+      const durationSeconds = (Date.now() - exerciseStartRef.current) / 1000;
+      trackMentalExerciseCompleted('objective_review', durationSeconds);
     } catch (err) {
       console.error('Save error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unable to save. Please try again.';
@@ -307,7 +324,7 @@ Response Format:
                         <View style={styles.historySection}>
                           <View style={styles.historySectionHeader}>
                             <MaterialCommunityIcons name="account" size={14} color="#999" />
-                            <Text style={styles.historySectionTitle}>Athlete's Voice</Text>
+                            <Text style={styles.historySectionTitle}>Athlete&apos;s Voice</Text>
                           </View>
                           <Text style={[styles.historyText, { color: '#999' }]}>
                             {review.athlete_vent}
@@ -318,7 +335,7 @@ Response Format:
                           <View style={styles.historySectionHeader}>
                             <MaterialCommunityIcons name="shield-check" size={14} color={BLUE_ENERGY} />
                             <Text style={[styles.historySectionTitle, { color: BLUE_ENERGY }]}>
-                              Coach's Voice
+                              Coach&apos;s Voice
                             </Text>
                           </View>
                           <Text style={[styles.historyText, { color: isDark ? '#FFF' : '#000' }]}>
@@ -442,7 +459,7 @@ function ReframedView({
       <View style={[styles.ventCard, { backgroundColor: isDark ? '#FFFFFF08' : '#00000008' }]}>
         <View style={styles.ventCardHeader}>
           <MaterialCommunityIcons name="account" size={16} color="#999" />
-          <Text style={styles.ventCardTitle}>The Athlete's Voice</Text>
+          <Text style={styles.ventCardTitle}>The Athlete&apos;s Voice</Text>
         </View>
         <Text style={[styles.ventTextDisplay, { color: '#999' }]}>{ventText}</Text>
       </View>
@@ -459,7 +476,7 @@ function ReframedView({
       >
         <View style={styles.coachCardHeader}>
           <MaterialCommunityIcons name="shield-check" size={16} color={BLUE_ENERGY} />
-          <Text style={[styles.coachCardTitle, { color: BLUE_ENERGY }]}>The Coach's Voice</Text>
+          <Text style={[styles.coachCardTitle, { color: BLUE_ENERGY }]}>The Coach&apos;s Voice</Text>
         </View>
         <Text style={[styles.reframedText, { color: isDark ? '#FFF' : '#000' }]}>
           {reframedText}

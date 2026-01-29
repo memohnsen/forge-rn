@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackHistoryFilterChanged, trackScreenView } from '@/utils/analytics';
 
 const FILTER_OPTIONS: HistoryFilter[] = ['Check-Ins', 'Workouts', 'Meets'];
 
@@ -39,6 +40,14 @@ export default function HistoryScreen() {
   } = useHistory();
 
   const [refreshing, setRefreshing] = React.useState(false);
+
+  React.useEffect(() => {
+    trackScreenView('history');
+  }, []);
+
+  React.useEffect(() => {
+    trackHistoryFilterChanged(selectedFilter);
+  }, [selectedFilter]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

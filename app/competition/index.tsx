@@ -23,6 +23,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackCompReflectionStarted,
+  trackCompReflectionSubmitted,
+  trackScreenView,
+} from '@/utils/analytics';
 
 const MEET_TYPES = ['Local', 'National', 'International'];
 
@@ -83,6 +88,11 @@ export default function CompetitionReflectionScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  React.useEffect(() => {
+    trackScreenView('competition_reflection');
+    trackCompReflectionStarted();
+  }, []);
+
   const hasCompletedForm = meetName.length > 0 && bodyweight.length > 0;
 
   const calculateBest = (lift1: string, lift2: string, lift3: string) => {
@@ -135,6 +145,8 @@ export default function CompetitionReflectionScreen() {
       if (error) {
         throw error;
       }
+
+      trackCompReflectionSubmitted(meetName, selectedMeetType, performanceRating);
 
       Alert.alert('Success!', 'Your competition report has been submitted.', [
         { text: 'OK', onPress: () => router.back() },

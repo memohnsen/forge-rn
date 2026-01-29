@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackCheckInStarted, trackCheckInSubmitted, trackScreenView } from '@/utils/analytics';
 
 const LIFT_OPTIONS_PL = ['Squat', 'Bench', 'Deadlift', 'Total', 'Accessories', 'Other'];
 const LIFT_OPTIONS = ['Snatch', 'Clean', 'Jerk', 'C & J', 'Total', 'Squats', 'Accessories', 'Other'];
@@ -62,6 +63,11 @@ export default function CheckInScreen() {
 
   const [concerns, setConcerns] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  React.useEffect(() => {
+    trackScreenView('check_in');
+    trackCheckInStarted();
+  }, []);
 
   // Calculate scores
   const physicalScore = Math.round(
@@ -110,6 +116,8 @@ export default function CheckInScreen() {
       if (error) {
         throw error;
       }
+
+      trackCheckInSubmitted(selectedLift, selectedIntensity, overallScore);
 
       router.push({
         pathname: '/check-in/confirmation',

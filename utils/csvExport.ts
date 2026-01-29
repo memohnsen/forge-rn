@@ -1,11 +1,17 @@
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { trackDataExported, trackHistoryExported } from '@/utils/analytics';
 
 interface CSVExportOptions {
   userId: string;
   getToken: () => Promise<string | null>;
 }
+
+type CSVResult = {
+  csv: string;
+  count: number;
+};
 
 // Helper function to escape CSV values
 function escapeCSV(value: string | number | null | undefined): string {
@@ -42,7 +48,7 @@ function convertToCSV(data: any[], headers: string[]): string {
   return csvRows.join('\n');
 }
 
-async function fetchCheckInsCSV(userId: string, supabase: any): Promise<string> {
+async function fetchCheckInsCSV(userId: string, supabase: any): Promise<CSVResult> {
   try {
     const { data, error } = await supabase
       .from('journal_daily_checkins')
@@ -53,7 +59,7 @@ async function fetchCheckInsCSV(userId: string, supabase: any): Promise<string> 
     if (error) throw error;
 
     if (!data || data.length === 0) {
-      return 'No daily check-ins data available\n';
+      return { csv: 'No daily check-ins data available\n', count: 0 };
     }
 
     const headers = [
@@ -80,14 +86,14 @@ async function fetchCheckInsCSV(userId: string, supabase: any): Promise<string> 
       'created_at'
     ];
 
-    return convertToCSV(data, headers);
+    return { csv: convertToCSV(data, headers), count: data.length };
   } catch (error) {
     console.error('Error fetching check-ins CSV:', error);
-    return 'Error fetching daily check-ins data\n';
+    return { csv: 'Error fetching daily check-ins data\n', count: 0 };
   }
 }
 
-async function fetchSessionReportsCSV(userId: string, supabase: any): Promise<string> {
+async function fetchSessionReportsCSV(userId: string, supabase: any): Promise<CSVResult> {
   try {
     const { data, error } = await supabase
       .from('journal_session_report')
@@ -98,7 +104,7 @@ async function fetchSessionReportsCSV(userId: string, supabase: any): Promise<st
     if (error) throw error;
 
     if (!data || data.length === 0) {
-      return 'No session reports data available\n';
+      return { csv: 'No session reports data available\n', count: 0 };
     }
 
     const headers = [
@@ -119,14 +125,14 @@ async function fetchSessionReportsCSV(userId: string, supabase: any): Promise<st
       'created_at'
     ];
 
-    return convertToCSV(data, headers);
+    return { csv: convertToCSV(data, headers), count: data.length };
   } catch (error) {
     console.error('Error fetching session reports CSV:', error);
-    return 'Error fetching session reports data\n';
+    return { csv: 'Error fetching session reports data\n', count: 0 };
   }
 }
 
-async function fetchCompReportsCSV(userId: string, supabase: any): Promise<string> {
+async function fetchCompReportsCSV(userId: string, supabase: any): Promise<CSVResult> {
   try {
     const { data, error } = await supabase
       .from('journal_comp_report')
@@ -137,7 +143,7 @@ async function fetchCompReportsCSV(userId: string, supabase: any): Promise<strin
     if (error) throw error;
 
     if (!data || data.length === 0) {
-      return 'No competition reports data available\n';
+      return { csv: 'No competition reports data available\n', count: 0 };
     }
 
     const headers = [
@@ -183,10 +189,10 @@ async function fetchCompReportsCSV(userId: string, supabase: any): Promise<strin
       'created_at'
     ];
 
-    return convertToCSV(data, headers);
+    return { csv: convertToCSV(data, headers), count: data.length };
   } catch (error) {
     console.error('Error fetching competition reports CSV:', error);
-    return 'Error fetching competition reports data\n';
+    return { csv: 'Error fetching competition reports data\n', count: 0 };
   }
 }
 
@@ -196,7 +202,7 @@ export async function createAndShareCSV({ userId, getToken }: CSVExportOptions):
     const supabase = createClerkSupabaseClient(getToken);
 
     // Fetch all data
-    const [checkInsCSV, sessionReportsCSV, compReportsCSV] = await Promise.all([
+    const [checkInsResult, sessionReportsResult, compReportsResult] = await Promise.all([
       fetchCheckInsCSV(userId, supabase),
       fetchSessionReportsCSV(userId, supabase),
       fetchCompReportsCSV(userId, supabase)
@@ -205,11 +211,11 @@ export async function createAndShareCSV({ userId, getToken }: CSVExportOptions):
     // Combine all CSV data with section headers
     // Use single quote prefix to prevent formula interpretation in spreadsheet apps
     let combinedCSV = "DAILY CHECK-INS\n";
-    combinedCSV += checkInsCSV;
+    combinedCSV += checkInsResult.csv;
     combinedCSV += "\n\nSESSION REPORTS\n";
-    combinedCSV += sessionReportsCSV;
+    combinedCSV += sessionReportsResult.csv;
     combinedCSV += "\n\nCOMPETITION REPORTS\n";
-    combinedCSV += compReportsCSV;
+    combinedCSV += compReportsResult.csv;
 
     // Create filename with current date
     const today = new Date();
@@ -234,6 +240,11 @@ export async function createAndShareCSV({ userId, getToken }: CSVExportOptions):
       dialogTitle: 'Export Forge Data',
       UTI: 'public.comma-separated-values-text'
     });
+
+    const totalCount =
+      checkInsResult.count + sessionReportsResult.count + compReportsResult.count;
+    trackHistoryExported('csv', totalCount);
+    trackDataExported('csv');
 
     return true;
   } catch (error) {

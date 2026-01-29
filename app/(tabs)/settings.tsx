@@ -19,6 +19,13 @@ import {
 } from 'react-native';
 import RevenueCatUI from 'react-native-purchases-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackCustomerCenterViewed,
+  trackCustomerSupportAccessed,
+  trackFeedbackSubmitted,
+  trackScreenView,
+  trackSettingsViewed,
+} from '@/utils/analytics';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -67,7 +74,9 @@ export default function SettingsScreen() {
 
   const handleCustomerSupport = async () => {
     try {
+      trackCustomerSupportAccessed();
       await RevenueCatUI.presentCustomerCenter();
+      trackCustomerCenterViewed();
     } catch (error) {
       console.error('Error presenting Customer Center:', error);
       Alert.alert('Error', 'Unable to open Customer Support. Please try again later.');
@@ -96,6 +105,11 @@ export default function SettingsScreen() {
       fetchUsers(userId);
     }
   }, [userId]);
+
+  useEffect(() => {
+    trackScreenView('settings');
+    trackSettingsViewed();
+  }, []);
 
   return (
     <View
@@ -150,7 +164,10 @@ export default function SettingsScreen() {
             title="Submit Feedback"
             accentColor="#5AB48C"
             isDark={isDark}
-            onPress={() => Linking.openURL('mailto:maddisen@meetcal.app')}
+            onPress={() => {
+              trackFeedbackSubmitted();
+              Linking.openURL('mailto:maddisen@meetcal.app');
+            }}
           />
         </View>
 

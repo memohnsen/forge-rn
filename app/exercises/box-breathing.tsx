@@ -14,6 +14,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
+import {
+  trackMentalExerciseCompleted,
+  trackMentalExerciseStarted,
+  trackScreenView,
+} from '@/utils/analytics';
 
 const PHASES = ['Inhale', 'Hold', 'Exhale', 'Hold'];
 
@@ -25,6 +30,11 @@ export default function BoxBreathingScreen() {
   const [holdDuration, setHoldDuration] = useState(4);
   const [numberOfRounds, setNumberOfRounds] = useState(10);
   const [isExerciseActive, setIsExerciseActive] = useState(false);
+  const exerciseStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    trackScreenView('box_breathing');
+  }, []);
 
   const totalTime = holdDuration * 4 * numberOfRounds;
   const totalMinutes = Math.floor(totalTime / 60);
@@ -38,7 +48,13 @@ export default function BoxBreathingScreen() {
         <BreathingExercise
           holdDuration={holdDuration}
           numberOfRounds={numberOfRounds}
-          onComplete={() => setIsExerciseActive(false)}
+          onComplete={() => {
+            if (exerciseStartRef.current) {
+              const durationSeconds = (Date.now() - exerciseStartRef.current) / 1000;
+              trackMentalExerciseCompleted('box_breathing', durationSeconds);
+            }
+            setIsExerciseActive(false);
+          }}
           isDark={isDark}
         />
       ) : (
@@ -172,7 +188,14 @@ export default function BoxBreathingScreen() {
               </Text>
             </View>
 
-            <Pressable onPress={() => setIsExerciseActive(true)} style={styles.startButton}>
+            <Pressable
+              onPress={() => {
+                exerciseStartRef.current = Date.now();
+                trackMentalExerciseStarted('box_breathing');
+                setIsExerciseActive(true);
+              }}
+              style={styles.startButton}
+            >
               <LinearGradient
                 colors={['#64B4DC', '#64B4DCD9']}
                 start={{ x: 0, y: 0 }}

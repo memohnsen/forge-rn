@@ -5,9 +5,6 @@ todos:
   - id: notifications
     content: "Implement notification settings: training schedule management, permission handling, and notification scheduling"
     status: pending
-  - id: analytics
-    content: Set up PostHog analytics integration throughout the app
-    status: pending
   - id: revenuecat
     content: Implement RevenueCat pay wall to end of onboarding
     status: pending
@@ -59,15 +56,6 @@ The Swift app is the reference implementation with full feature set. The React N
 - Implementation needed:
   - Native module or separate widget app
   - Shared data storage (App Groups)
-
-**Analytics Integration**
-
-- PostHog integration
-- Event tracking throughout app
-- Implementation needed:
-  - `posthog-react-native` setup
-  - `utils/analytics.ts` - Analytics wrapper
-  - Event tracking in key user actions
 
 **RevenueCat Integration**
 

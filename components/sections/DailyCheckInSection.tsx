@@ -66,7 +66,7 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
           </View>
 
           <Text style={styles.description}>
-            How is your body feeling before today's session? Track your readiness to optimize your
+            How is your body feeling before today&apos;s session? Track your readiness to optimize your
             training.
           </Text>
 

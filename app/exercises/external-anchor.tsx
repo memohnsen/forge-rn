@@ -1,7 +1,7 @@
 import { colors } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +14,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackMentalExerciseCompleted,
+  trackMentalExerciseStarted,
+  trackScreenView,
+} from '@/utils/analytics';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 type StepInfo = {
@@ -81,6 +86,12 @@ export default function ExternalAnchorScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [userInputs, setUserInputs] = useState<string[]>(Array.from({ length: 7 }, () => ''));
   const [currentInput, setCurrentInput] = useState('');
+  const exerciseStartRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    trackScreenView('external_anchor');
+    trackMentalExerciseStarted('external_anchor');
+  }, []);
 
   const stepInfo = STEPS[currentStep];
   const stepColor = STEP_COLORS[currentStep] ?? STEP_COLORS[0];
@@ -104,6 +115,8 @@ export default function ExternalAnchorScreen() {
     if (currentStep < STEPS.length - 1) {
       setCurrentStep((prev) => prev + 1);
     } else {
+      const durationSeconds = (Date.now() - exerciseStartRef.current) / 1000;
+      trackMentalExerciseCompleted('external_anchor', durationSeconds);
       router.back();
     }
   };

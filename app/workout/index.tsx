@@ -20,6 +20,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  trackScreenView,
+  trackSessionReflectionStarted,
+  trackSessionReflectionSubmitted,
+} from '@/utils/analytics';
 
 const TIMES_OF_DAY = ['Early Morning', 'Late Morning', 'Afternoon', 'Evening', 'Night'];
 const LIFT_OPTIONS_PL = ['Squat', 'Bench', 'Deadlift', 'Total', 'Accessories', 'Other'];
@@ -62,6 +67,11 @@ export default function WorkoutReflectionScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  React.useEffect(() => {
+    trackScreenView('session_reflection');
+    trackSessionReflectionStarted();
+  }, []);
+
   const hasCompletedForm = cues.length > 0;
 
   const handleSubmit = async () => {
@@ -94,6 +104,8 @@ export default function WorkoutReflectionScreen() {
       if (error) {
         throw error;
       }
+
+      trackSessionReflectionSubmitted(selectedLift, selectedIntensity, sessionRPE);
 
       Alert.alert('Success!', 'Your session reflection has been submitted.', [
         { text: 'OK', onPress: () => router.back() },

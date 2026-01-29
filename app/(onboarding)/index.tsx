@@ -28,6 +28,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  setOnboardingCompleted,
+  trackMeetDaysUpdated,
+  trackOnboardingCompleted,
+  trackOnboardingPageViewed,
+  trackOnboardingStarted,
+  trackScreenView,
+} from '@/utils/analytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -132,6 +140,7 @@ export default function OnboardingScreen() {
   const [setupProgress, setSetupProgress] = useState(0);
   const [selectedDayForTime, setSelectedDayForTime] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hasTrackedStart = useRef(false);
 
   // Refs for ScrollViews to reset scroll position
   const scrollViewRef = useRef<ScrollView>(null);
@@ -149,6 +158,18 @@ export default function OnboardingScreen() {
   useEffect(() => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   }, [currentPage]);
+
+  useEffect(() => {
+    if (!hasTrackedStart.current) {
+      trackScreenView('onboarding');
+      trackOnboardingStarted();
+      hasTrackedStart.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    trackOnboardingPageViewed(currentPage, totalPages);
+  }, [currentPage, totalPages]);
 
   useEffect(() => {
     if (currentPage === 9) {
@@ -197,6 +218,7 @@ export default function OnboardingScreen() {
       try {
         // Pre-auth onboarding: mark device-level completion and route to sign-in
         await SecureStore.setItemAsync('hasSeenOnboarding_device', 'true');
+        trackOnboardingCompleted();
         router.replace('/(auth)/sign-in');
       } catch (err: unknown) {
         console.error('Error completing pre-auth onboarding:', err);
@@ -244,6 +266,10 @@ export default function OnboardingScreen() {
       // Mark onboarding as complete (user-scoped key)
       await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');
       await SecureStore.deleteItemAsync(`forceOnboarding_${userId}`);
+
+      trackOnboardingCompleted();
+      setOnboardingCompleted(true);
+      trackMeetDaysUpdated(Object.keys(data.trainingDays).length);
 
       router.replace('/(tabs)');
     } catch (err: unknown) {
