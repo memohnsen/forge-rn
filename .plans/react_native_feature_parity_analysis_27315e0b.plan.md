@@ -5,8 +5,8 @@ todos:
   - id: notifications
     content: "Implement notification settings: training schedule management, permission handling, and notification scheduling"
     status: pending
-  - id: visualization
-    content: "Visualization exercise implementation"
+  - id: connected-apps
+    content: Implement Oura and Whoop OAuth integrations with token management
     status: pending
   - id: onboarding
     content: Create onboarding flow for new users
@@ -57,11 +57,19 @@ The Swift app is the reference implementation with full feature set. The React N
 
 All exercise implementations are missing:
 
-**Visualization** (`app/exercises/visualization.tsx`)
+**Box Breathing** (`app/exercises/box-breathing.tsx`)
+
+- Breathing animation/visualization
+- Timer functionality
+- Session tracking
+
+**Visualization** (`app/exercises/visualization.tsx`) ✅ IMPLEMENTED
 
 - Guided visualization flow
-- Audio playback (optional)
-- Session tracking
+- Audio playback with ElevenLabs TTS
+- Script generation via OpenRouter
+- Voice selection (Matilda, Brian, Daniel)
+- Caching support
 
 #### 3. Trends Screen Enhancements
 
