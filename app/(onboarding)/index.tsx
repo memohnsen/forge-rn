@@ -178,10 +178,18 @@ export default function OnboardingScreen() {
   const isTrainingDaysValid = Object.keys(data.trainingDays).length > 0;
 
   const handleCompleteOnboarding = async () => {
+    // Guard against re-entrancy from rapid taps
+    if (isLoading) return;
     if (!userId) return;
 
     setIsLoading(true);
     try {
+      // Format date as local YYYY-MM-DD to avoid UTC timezone shifts
+      const year = data.nextCompDate.getFullYear();
+      const month = String(data.nextCompDate.getMonth() + 1).padStart(2, '0');
+      const day = String(data.nextCompDate.getDate()).padStart(2, '0');
+      const localDateString = `${year}-${month}-${day}`;
+
       const userProfile: User = {
         user_id: userId,
         first_name: data.firstName,
@@ -193,7 +201,7 @@ export default function OnboardingScreen() {
         biggest_struggle: data.biggestStruggle,
         training_days: data.trainingDays,
         next_competition: data.nextComp,
-        next_competition_date: data.nextCompDate.toISOString().split('T')[0],
+        next_competition_date: localDateString,
         current_tracking_method: data.currentTrackingMethod,
         biggest_frustration: data.biggestFrustration,
         reflection_frequency: data.reflectionFrequency,
@@ -204,8 +212,8 @@ export default function OnboardingScreen() {
 
       if (error) throw error;
 
-      // Mark onboarding as complete
-      await SecureStore.setItemAsync('hasSeenOnboarding', 'true');
+      // Mark onboarding as complete (user-scoped key)
+      await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');
 
       router.replace('/(tabs)');
     } catch (err) {
@@ -622,7 +630,7 @@ export default function OnboardingScreen() {
           </LinearGradient>
 
           <Text style={[styles.setupMessage, { color: isDark ? '#AAAAAA' : '#666666' }]}>
-            We're setting up your personalized journal based on your preferences
+            {"We're setting up your personalized journal based on your preferences"}
           </Text>
 
           <View style={styles.progressBarContainer}>

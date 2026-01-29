@@ -34,15 +34,23 @@ function InitialLayout() {
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
 
+  // User-scoped key to prevent cross-account onboarding status leaks
+  const getOnboardingKey = useCallback(
+    (uid: string) => `hasSeenOnboarding_${uid}`,
+    []
+  );
+
   const checkOnboardingStatus = useCallback(async () => {
     if (!userId) {
       setIsCheckingOnboarding(false);
       return;
     }
 
+    const onboardingKey = getOnboardingKey(userId);
+
     try {
-      // First check local storage for cached onboarding status
-      const cachedStatus = await SecureStore.getItemAsync('hasSeenOnboarding');
+      // First check local storage for cached onboarding status (user-scoped)
+      const cachedStatus = await SecureStore.getItemAsync(onboardingKey);
       if (cachedStatus === 'true') {
         setHasCompletedOnboarding(true);
         setIsCheckingOnboarding(false);
@@ -62,7 +70,7 @@ function InitialLayout() {
 
       if (data && !error) {
         // User exists in DB, they've completed onboarding
-        await SecureStore.setItemAsync('hasSeenOnboarding', 'true');
+        await SecureStore.setItemAsync(onboardingKey, 'true');
         setHasCompletedOnboarding(true);
       } else {
         // User doesn't exist, needs onboarding
@@ -74,7 +82,7 @@ function InitialLayout() {
     } finally {
       setIsCheckingOnboarding(false);
     }
-  }, [userId, getToken]);
+  }, [userId, getToken, getOnboardingKey]);
 
   useEffect(() => {
     if (isSignedIn && userId) {

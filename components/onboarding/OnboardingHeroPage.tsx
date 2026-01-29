@@ -52,6 +52,7 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
     iconScale.setValue(0);
     secondaryScale.setValue(0);
     secondaryOpacity.setValue(0);
+    orbitRotation.setValue(0);
     buttonOpacity.setValue(0);
     buttonTranslateY.setValue(20);
 
@@ -95,14 +96,20 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
       }),
     ]).start();
 
-    // Continuous orbit rotation
-    Animated.loop(
+    // Continuous orbit rotation - store reference for cleanup
+    const orbitLoop = Animated.loop(
       Animated.timing(orbitRotation, {
         toValue: 1,
         duration: 20000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    orbitLoop.start();
+
+    // Cleanup: stop the orbit animation when currentStep changes or component unmounts
+    return () => {
+      orbitLoop.stop();
+    };
   }, [currentStep]);
 
   const orbitRotateStyle = {
