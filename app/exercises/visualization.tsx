@@ -3,7 +3,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
 import { Buffer } from 'buffer';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -23,7 +23,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { textToSpeech, VOICES, VoiceOption } from '@/services/elevenlabs';
+import { textToSpeech, VoiceOption, VOICES } from '@/services/elevenlabs';
 import { queryOpenRouter } from '@/services/openrouter';
 import { createClerkSupabaseClient } from '@/services/supabase';
 
@@ -495,7 +495,7 @@ function SetupScreen({
                 Saved Version Available
               </Text>
               <Text style={styles.cachedToggleSubtitle}>
-                Play without using API credits
+                Play without having to wait
               </Text>
             </View>
             <Switch
@@ -604,6 +604,7 @@ function PlayerScreen({
   movement: string;
   onComplete: () => void;
 }) {
+  const modalInsets = useSafeAreaInsets();
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -853,13 +854,40 @@ function PlayerScreen({
         onRequestClose={() => setShowScript(false)}
       >
         <View style={[styles.modalContainer, { backgroundColor: isDark ? '#000' : '#F5F5F5' }]}>
-          <View style={[styles.modalHeader, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}>
-            <Text style={[styles.modalTitle, { color: isDark ? '#FFF' : '#000' }]}>
-              Visualization Script
-            </Text>
-            <Pressable onPress={() => setShowScript(false)}>
-              <Text style={[styles.modalDone, { color: PLAYER_COLOR }]}>Done</Text>
-            </Pressable>
+          <View
+            style={[
+              styles.modalHeader,
+              {
+                backgroundColor: isDark ? '#141414' : '#FFFFFF',
+                paddingTop: 20,
+                borderBottomColor: isDark ? '#222' : '#E9E9E9',
+              },
+            ]}
+          >
+            <View style={styles.modalHeaderContent}>
+              <View style={styles.modalTitleRow}>
+                <View
+                  style={[
+                    styles.modalIconCircle,
+                    { backgroundColor: isDark ? '#1F1F1F' : '#F3F3F3' },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="file-document-outline" size={18} color={PLAYER_COLOR} />
+                </View>
+                <Text style={[styles.modalTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                  Visualization Script
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowScript(false)}
+                style={[
+                  styles.modalDoneButton,
+                  { backgroundColor: isDark ? '#1E1E1E' : '#F1F1F1' },
+                ]}
+              >
+                <Text style={[styles.modalDone, { color: PLAYER_COLOR }]}>Done</Text>
+              </Pressable>
+            </View>
           </View>
           <ScrollView
             style={styles.scriptScrollView}
@@ -1211,19 +1239,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  modalHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  modalIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalDoneButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
   },
   modalDone: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '600',
   },
   scriptScrollView: {
