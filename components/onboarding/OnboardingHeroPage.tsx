@@ -1,4 +1,3 @@
-import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
@@ -124,35 +123,43 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
-      {/* Progress Indicators */}
-      <View style={styles.progressContainer}>
-        {Array.from({ length: totalSteps }).map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.progressDot,
-              {
-                backgroundColor:
-                  index < currentStep ? pageData.accentColor : isDark ? '#333333' : '#DDDDDD',
-                width: index === currentStep - 1 ? 24 : 8,
-              },
-            ]}
-          />
-        ))}
-      </View>
+    <View style={styles.container}>
+      {/* Background with gradient */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [`${pageData.accentColor}15`, '#000000']
+            : [`${pageData.accentColor}08`, '#F5F5F5']
+        }
+        locations={[0, 0.9]}
+        style={styles.backgroundGradient}
+      />
 
-      {/* Hero Graphic */}
-      <View style={styles.heroContainer}>
+      {/* Content wrapper */}
+      <View style={styles.contentWrapper}>
+        {/* Progress Indicators */}
+        <View style={styles.progressContainer}>
+          {Array.from({ length: totalSteps }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.progressDot,
+                {
+                  backgroundColor:
+                    index < currentStep ? pageData.accentColor : isDark ? '#333333' : '#DDDDDD',
+                  width: index === currentStep - 1 ? 24 : 8,
+                },
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* Hero Graphic */}
+        <View style={styles.heroContainer}>
         {/* Background circles */}
         <View style={[styles.circle, styles.circle1, { borderColor: `${pageData.accentColor}15` }]} />
         <View style={[styles.circle, styles.circle2, { borderColor: `${pageData.accentColor}10` }]} />
         <View style={[styles.circle, styles.circle3, { borderColor: `${pageData.accentColor}08` }]} />
-
-        {/* Orbiting circle */}
-        <Animated.View style={[styles.orbitContainer, orbitRotateStyle]}>
-          <View style={[styles.orbitDot, { backgroundColor: `${pageData.accentColor}60` }]} />
-        </Animated.View>
 
         {/* Main Icon */}
         <Animated.View style={{ transform: [{ scale: iconScale }] }}>
@@ -192,37 +199,48 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
         </Text>
       </View>
 
-      {/* Button */}
-      <Animated.View
-        style={[
-          styles.buttonContainer,
-          {
-            opacity: buttonOpacity,
-            transform: [{ translateY: buttonTranslateY }],
-          },
-        ]}
-      >
-        <Pressable
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-          onPress={onNext}
+        {/* Button */}
+        <Animated.View
+          style={[
+            styles.buttonContainer,
+            {
+              opacity: buttonOpacity,
+              transform: [{ translateY: buttonTranslateY }],
+            },
+          ]}
         >
-          <LinearGradient
-            colors={[pageData.accentColor, `${pageData.accentColor}D9`]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.buttonGradient, { shadowColor: pageData.accentColor }]}
+          <Pressable
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+            onPress={onNext}
           >
-            <Text style={styles.buttonText}>{pageData.buttonText}</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </LinearGradient>
-        </Pressable>
-      </Animated.View>
+            <LinearGradient
+              colors={[pageData.accentColor, `${pageData.accentColor}D9`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.buttonGradient, { shadowColor: pageData.accentColor }]}
+            >
+              <Text style={styles.buttonText}>{pageData.buttonText}</Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  contentWrapper: {
     flex: 1,
     justifyContent: 'space-between',
     paddingTop: 80,

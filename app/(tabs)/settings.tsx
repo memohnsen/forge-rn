@@ -5,6 +5,8 @@ import { createAndShareCSV } from '@/utils/csvExport';
 import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -23,6 +25,7 @@ export default function SettingsScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const { userId, getToken } = useAuth();
+  const router = useRouter();
   const { user, fetchUsers, updateCoachEmail } = useHome();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -79,6 +82,18 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleStartOnboarding = async () => {
+    if (!userId) return;
+
+    try {
+      await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
+      router.replace('/(onboarding)');
+    } catch (error) {
+      console.error('Error starting onboarding:', error);
+      Alert.alert('Error', 'Unable to start onboarding. Please try again.');
+    }
+  };
+
   useEffect(() => {
     if (userId) {
       fetchUsers(userId);
@@ -125,6 +140,13 @@ export default function SettingsScreen() {
             accentColor="#8C64C8"
             isDark={isDark}
             onPress={() => setShowCoachEmailSheet(true)}
+          />
+          <SettingsRow
+            icon="flag-checkered"
+            title="Redo Onboarding"
+            accentColor="#FFA050"
+            isDark={isDark}
+            onPress={handleStartOnboarding}
           />
           <SettingsRow
             icon="help-circle"

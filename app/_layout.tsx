@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { createClerkSupabaseClient } from '@/services/supabase';
+import { SplashScreen } from '@/components/SplashScreen';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -33,10 +34,15 @@ function InitialLayout() {
   const router = useRouter();
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
 
   // User-scoped key to prevent cross-account onboarding status leaks
   const getOnboardingKey = useCallback(
     (uid: string) => `hasSeenOnboarding_${uid}`,
+    []
+  );
+  const getForceOnboardingKey = useCallback(
+    (uid: string) => `forceOnboarding_${uid}`,
     []
   );
 
@@ -47,8 +53,16 @@ function InitialLayout() {
     }
 
     const onboardingKey = getOnboardingKey(userId);
+    const forceOnboardingKey = getForceOnboardingKey(userId);
 
     try {
+      const forceOnboarding = await SecureStore.getItemAsync(forceOnboardingKey);
+      if (forceOnboarding === 'true') {
+        setHasCompletedOnboarding(false);
+        setIsCheckingOnboarding(false);
+        return;
+      }
+
       // First check local storage for cached onboarding status (user-scoped)
       const cachedStatus = await SecureStore.getItemAsync(onboardingKey);
       if (cachedStatus === 'true') {
@@ -93,8 +107,17 @@ function InitialLayout() {
     }
   }, [isSignedIn, userId, checkOnboardingStatus]);
 
+  // Hide splash screen after 2 seconds
   useEffect(() => {
-    if (!isLoaded || isCheckingOnboarding) return;
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || isCheckingOnboarding || showSplash) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
@@ -111,7 +134,12 @@ function InitialLayout() {
       // Not signed in and not on auth screen, redirect to sign in
       router.replace('/(auth)/sign-in');
     }
-  }, [isLoaded, isSignedIn, segments, isCheckingOnboarding, hasCompletedOnboarding]);
+  }, [isLoaded, isSignedIn, segments, isCheckingOnboarding, hasCompletedOnboarding, showSplash]);
+
+  // Show splash screen while loading
+  if (showSplash || !isLoaded || isCheckingOnboarding) {
+    return <SplashScreen />;
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>

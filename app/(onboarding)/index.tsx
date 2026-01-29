@@ -1,14 +1,14 @@
 import { OnboardingHeroPage } from '@/components/onboarding/OnboardingHeroPage';
-import { colors } from '@/constants/colors';
-import { useOnboarding } from '@/contexts/OnboardingContext';
+import { DatePickerSection } from '@/components/ui/DatePickerSection';
+import { FormSubmitButton } from '@/components/ui/FormSubmitButton';
 import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
-import { DatePickerSection } from '@/components/ui/DatePickerSection';
-import { FormSubmitButton } from '@/components/ui/FormSubmitButton';
+import { colors } from '@/constants/colors';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { User } from '@/models/User';
-import { useAuth } from '@clerk/clerk-expo';
 import { createClerkSupabaseClient } from '@/services/supabase';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -34,7 +34,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Hero page data for pages 1-4
 const heroPages = [
   {
-    primaryIcon: 'head-outline' as const,
+    primaryIcon: 'body' as const,
     secondaryIcon: 'warning' as const,
     title: 'Is your mindset limiting your total?',
     message:
@@ -133,6 +133,9 @@ export default function OnboardingScreen() {
   const [selectedDayForTime, setSelectedDayForTime] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Refs for ScrollViews to reset scroll position
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
       return getToken({ template: 'supabase', skipCache: true });
@@ -141,6 +144,11 @@ export default function OnboardingScreen() {
 
   // Setup animation for final page
   const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Reset scroll position when page changes
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+  }, [currentPage]);
 
   useEffect(() => {
     if (currentPage === 9) {
@@ -220,6 +228,7 @@ export default function OnboardingScreen() {
 
       // Mark onboarding as complete (user-scoped key)
       await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');
+      await SecureStore.deleteItemAsync(`forceOnboarding_${userId}`);
 
       router.replace('/(tabs)');
     } catch (err: unknown) {
@@ -270,6 +279,7 @@ export default function OnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
@@ -329,6 +339,7 @@ export default function OnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
@@ -403,6 +414,7 @@ export default function OnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
@@ -455,6 +467,7 @@ export default function OnboardingScreen() {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
@@ -485,35 +498,70 @@ export default function OnboardingScreen() {
             </View>
 
             <View style={styles.daysContainer}>
-              {weekDays.map((day) => {
-                const isSelected = !!data.trainingDays[day];
-                return (
-                  <Pressable
-                    key={day}
-                    style={[
-                      styles.dayButton,
-                      {
-                        backgroundColor: isSelected
-                          ? colors.blueEnergy
-                          : isDark
-                            ? '#2A2A2A'
-                            : '#F0F0F0',
-                        borderColor: isSelected ? colors.blueEnergy : 'transparent',
-                      },
-                    ]}
-                    onPress={() => toggleTrainingDay(day)}
-                  >
-                    <Text
+              {/* First row - 4 days */}
+              <View style={styles.daysRow}>
+                {weekDays.slice(0, 4).map((day) => {
+                  const isSelected = !!data.trainingDays[day];
+                  return (
+                    <Pressable
+                      key={day}
                       style={[
-                        styles.dayText,
-                        { color: isSelected ? '#FFFFFF' : isDark ? '#AAAAAA' : '#666666' },
+                        styles.dayButton,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.blueEnergy
+                            : isDark
+                              ? '#2A2A2A'
+                              : '#F0F0F0',
+                          borderColor: isSelected ? colors.blueEnergy : 'transparent',
+                        },
                       ]}
+                      onPress={() => toggleTrainingDay(day)}
                     >
-                      {day.slice(0, 3)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                      <Text
+                        style={[
+                          styles.dayText,
+                          { color: isSelected ? '#FFFFFF' : isDark ? '#AAAAAA' : '#666666' },
+                        ]}
+                      >
+                        {day.slice(0, 3)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {/* Second row - 3 days */}
+              <View style={styles.daysRow}>
+                {weekDays.slice(4).map((day) => {
+                  const isSelected = !!data.trainingDays[day];
+                  return (
+                    <Pressable
+                      key={day}
+                      style={[
+                        styles.dayButton,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.blueEnergy
+                            : isDark
+                              ? '#2A2A2A'
+                              : '#F0F0F0',
+                          borderColor: isSelected ? colors.blueEnergy : 'transparent',
+                        },
+                      ]}
+                      onPress={() => toggleTrainingDay(day)}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          { color: isSelected ? '#FFFFFF' : isDark ? '#AAAAAA' : '#666666' },
+                        ]}
+                      >
+                        {day.slice(0, 3)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             {Object.keys(data.trainingDays).length > 0 && (
@@ -622,12 +670,17 @@ export default function OnboardingScreen() {
       <View
         style={[
           styles.container,
-          styles.setupContainer,
           { backgroundColor: isDark ? '#000000' : '#F5F5F5' },
         ]}
       >
-        <SectionHeader title="Setting Up" isDark={isDark} />
+        {/* Custom Header */}
+        <View style={[styles.setupHeader, { paddingTop: insets.top + 16 }]}>
+          <Text style={[styles.setupTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Setting Up
+          </Text>
+        </View>
 
+        {/* Content */}
         <View style={styles.setupContent}>
           <LinearGradient
             colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
@@ -683,15 +736,18 @@ export default function OnboardingScreen() {
           )}
         </View>
 
+        {/* Button at bottom */}
         {setupProgress >= 100 && (
-          <FormSubmitButton
-            title={errorMessage ? 'Try Again' : "Let's get started!"}
-            icon={errorMessage ? 'refresh' : 'rocket'}
-            isLoading={isLoading}
-            isEnabled={true}
-            accentColor={errorMessage ? '#FF3B30' : colors.blueEnergy}
-            onPress={handleCompleteOnboarding}
-          />
+          <View style={[styles.setupButtonContainer, { paddingBottom: insets.bottom + 30 }]}>
+            <FormSubmitButton
+              title={errorMessage ? 'Try Again' : "Let's get started!"}
+              icon={errorMessage ? 'refresh' : 'rocket'}
+              isLoading={isLoading}
+              isEnabled={true}
+              accentColor={errorMessage ? '#FF3B30' : colors.blueEnergy}
+              onPress={handleCompleteOnboarding}
+            />
+          </View>
         )}
       </View>
     );
@@ -821,16 +877,20 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
   },
+  daysRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-start',
+  },
   dayButton: {
-    paddingHorizontal: 16,
+    flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1.5,
+    alignItems: 'center',
   },
   dayText: {
     fontSize: 14,
@@ -909,13 +969,23 @@ const styles = StyleSheet.create({
   timeOptionText: {
     fontSize: 17,
   },
-  setupContainer: {
+  setupHeader: {
+    alignItems: 'center',
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+  },
+  setupTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  setupContent: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  setupContent: {
-    alignItems: 'center',
-    marginBottom: 40,
+  setupButtonContainer: {
+    paddingHorizontal: 0,
   },
   setupIconCircle: {
     width: 100,
