@@ -303,12 +303,14 @@ export const refreshWhoopToken = async (
   try {
     const refreshToken = await getWhoopRefreshToken(userId);
     if (!refreshToken) {
-      throw new Error('No refresh token available');
+      console.warn('[Whoop] No refresh token available');
+      return false;
     }
 
     const clerkToken = await getClerkToken();
     if (!clerkToken) {
-      throw new Error('No Clerk token available');
+      console.warn('[Whoop] No Clerk token available');
+      return false;
     }
 
     const response = await fetch(`${SUPABASE_URL}/functions/v1/whoop-token-exchange`, {

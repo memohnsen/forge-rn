@@ -1,26 +1,24 @@
-import { colors } from '@/constants/colors';
 import { CoachEmailSheet } from '@/components/CoachEmailSheet';
+import { colors } from '@/constants/colors';
 import { useHome } from '@/hooks/use-home';
 import { createAndShareCSV } from '@/utils/csvExport';
 import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
-  View,
+  View
 } from 'react-native';
+import RevenueCatUI from 'react-native-purchases-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RevenueCatUI } from 'react-native-purchases-ui';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -28,7 +26,6 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId, getToken } = useAuth();
-  const router = useRouter();
   const { user, fetchUsers, updateCoachEmail } = useHome();
 
   const [isExporting, setIsExporting] = useState(false);

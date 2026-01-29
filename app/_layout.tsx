@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { SplashScreen } from '@/components/SplashScreen';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Purchases from 'react-native-purchases';
 
 const tokenCache = {
@@ -202,7 +202,11 @@ function InitialLayout() {
         <Stack.Screen name="trends" options={{ presentation: 'card' }} />
         <Stack.Screen name="exercises" options={{ presentation: 'card' }} />
       </Stack>
-      {showSplashOverlay ? <SplashScreen /> : null}
+      {showSplashOverlay ? (
+        <View style={styles.splashOverlay}>
+          <SplashScreen />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -216,3 +220,9 @@ export default function RootLayout() {
     </ClerkProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+});
