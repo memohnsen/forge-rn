@@ -58,7 +58,7 @@ const heroPages = [
     message:
       "Daily check-ins and reflections help you understand how your body is holding up. Listen to your body, don't fight against it.",
     buttonText: "I'm Ready",
-    accentColor: colors.scoreGreen,
+    accentColor: '#34C759', // iOS system green
   },
   {
     primaryIcon: 'trophy' as const,
@@ -220,7 +220,7 @@ export default function OnboardingScreen() {
     if (newDays[day]) {
       delete newDays[day];
     } else {
-      newDays[day] = '6:00 AM';
+      newDays[day] = '4:00 AM';
       setSelectedDayForTime(day);
     }
     updateData({ trainingDays: newDays });
