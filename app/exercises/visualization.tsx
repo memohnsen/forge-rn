@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
+import { Buffer } from 'buffer';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -98,8 +99,9 @@ export default function VisualizationScreen() {
 
   function getCacheKey(mov: string, c: string, voiceId: string): string {
     const combined = `${mov}_${c}_${voiceId}`;
-    // Simple hash - base64 encode and clean up
-    const hash = btoa(combined)
+    // UTF-8 safe base64 encoding using buffer package
+    const hash = Buffer.from(combined, 'utf8')
+      .toString('base64')
       .replace(/\//g, '_')
       .replace(/\+/g, '-')
       .slice(0, 50);
@@ -211,13 +213,8 @@ Generate only the script text, no titles or headers. Start directly with the vis
   }
 
   function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+    // UTF-8 safe base64 encoding using buffer package
+    return Buffer.from(new Uint8Array(buffer)).toString('base64');
   }
 
   function handlePlayerComplete() {
@@ -596,6 +593,8 @@ function PlayerScreen({
   const [position, setPosition] = useState(0);
   const [showScript, setShowScript] = useState(false);
 
+  // Mutable ref to track the Audio.Sound instance for cleanup
+  const soundRef = useRef<Audio.Sound | null>(null);
   const glowAnim = useRef(new Animated.Value(0.4)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -604,8 +603,9 @@ function PlayerScreen({
     startGlowAnimation();
 
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      // Use ref to ensure we clean up the actual sound instance
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
       }
     };
   }, []);
@@ -656,6 +656,8 @@ function PlayerScreen({
         onPlaybackStatusUpdate
       );
 
+      // Store in both ref (for cleanup) and state (for UI)
+      soundRef.current = newSound;
       setSound(newSound);
       setIsPlaying(true);
     } catch (error) {
