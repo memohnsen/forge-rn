@@ -131,6 +131,7 @@ export default function OnboardingScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [setupProgress, setSetupProgress] = useState(0);
   const [selectedDayForTime, setSelectedDayForTime] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -183,6 +184,7 @@ export default function OnboardingScreen() {
     if (!userId) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       // Format date as local YYYY-MM-DD to avoid UTC timezone shifts
       const year = data.nextCompDate.getFullYear();
@@ -216,8 +218,11 @@ export default function OnboardingScreen() {
       await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');
 
       router.replace('/(tabs)');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error completing onboarding:', err);
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setErrorMessage(message);
     } finally {
       setIsLoading(false);
     }
@@ -655,7 +660,7 @@ export default function OnboardingScreen() {
             </Text>
           </View>
 
-          {setupProgress >= 100 && (
+          {setupProgress >= 100 && !errorMessage && (
             <View style={styles.completeContainer}>
               <View style={[styles.completeBadge, { backgroundColor: `${colors.scoreGreen}1F` }]}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.scoreGreen} />
@@ -663,15 +668,24 @@ export default function OnboardingScreen() {
               </View>
             </View>
           )}
+
+          {errorMessage && (
+            <View style={styles.errorContainer}>
+              <View style={[styles.errorBadge, { backgroundColor: '#FF3B301F' }]}>
+                <Ionicons name="alert-circle" size={20} color="#FF3B30" />
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {setupProgress >= 100 && (
           <FormSubmitButton
-            title="Let's get started!"
-            icon="rocket"
+            title={errorMessage ? 'Try Again' : "Let's get started!"}
+            icon={errorMessage ? 'refresh' : 'rocket'}
             isLoading={isLoading}
             isEnabled={true}
-            accentColor={colors.blueEnergy}
+            accentColor={errorMessage ? '#FF3B30' : colors.blueEnergy}
             onPress={handleCompleteOnboarding}
           />
         )}
@@ -947,5 +961,22 @@ const styles = StyleSheet.create({
   completeText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorContainer: {
+    marginTop: 24,
+  },
+  errorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FF3B30',
+    flexShrink: 1,
   },
 });
