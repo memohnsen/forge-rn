@@ -171,7 +171,8 @@ export default function OnboardingScreen() {
     data.reflectionFrequency.length > 0 &&
     data.whatHoldingBack.length > 0;
 
-  const isUserInfoValid = data.firstName.length > 0 && data.lastName.length > 0;
+  const isUserInfoValid =
+    data.firstName.length > 0 && data.lastName.length > 0 && data.sport.length > 0;
 
   const isSportingInfoValid =
     data.goal.length > 0 && data.biggestStruggle.length > 0 && data.nextComp.length > 0;
@@ -210,7 +211,10 @@ export default function OnboardingScreen() {
         what_holding_back: data.whatHoldingBack,
       };
 
-      const { error } = await supabase.from('journal_users').insert(userProfile);
+      // Use upsert to make onboarding completion idempotent
+      const { error } = await supabase
+        .from('journal_users')
+        .upsert(userProfile, { onConflict: 'user_id' });
 
       if (error) throw error;
 
