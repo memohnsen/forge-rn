@@ -5,9 +5,6 @@ todos:
   - id: notifications
     content: "Implement notification settings: training schedule management, permission handling, and notification scheduling"
     status: pending
-  - id: connected-apps
-    content: Implement Oura and Whoop OAuth integrations with token management
-    status: pending
   - id: visualization
     content: "Visualization exercise implementation"
     status: pending
@@ -17,9 +14,6 @@ todos:
   - id: analytics
     content: Set up PostHog analytics integration throughout the app
     status: pending
-  - id: revenuecat
-    content: Implement RevenueCat Customer Center integration
-    status: completed
 isProject: false
 ---
 
@@ -59,60 +53,9 @@ The Swift app is the reference implementation with full feature set. The React N
   - Training days storage/retrieval from Supabase
   - Integration with `expo-notifications`
 
-**Connected Apps** (`app/settings/connected-apps.tsx`)
-
-- Oura OAuth integration
-- Whoop OAuth integration
-- Connection status display
-- Token storage toggle (store for reports vs. session-only)
-- Disconnect functionality
-- Implementation needed:
-  - `services/oura.ts` - Oura OAuth flow
-  - `services/whoop.ts` - Whoop OAuth flow
-  - `utils/ouraTokenManager.ts` - Token refresh logic
-  - `utils/whoopTokenManager.ts` - Token refresh logic
-  - Deep linking setup for OAuth callbacks
-  - Keychain/secure storage for tokens
-
-**Export Data** (`app/settings/export.tsx`)
-
-- CSV export functionality
-- Include check-ins, workouts, meets data
-- Include Oura/Whoop data (if stored)
-- File sharing via native share sheet
-- Implementation needed:
-  - `utils/csvExport.ts` - CSV generation logic
-  - `utils/fileSystem.ts` - File creation/writing
-  - Integration with `expo-sharing` or `expo-file-system`
-
-**Auto-Send Results** (`app/settings/auto-send.tsx`)
-
-- Coach email input/editing
-- Email validation
-- Privacy notice display
-- Save to user profile
-- Backend integration for weekly email sending
-- Implementation needed:
-  - Form component with email validation
-  - Supabase update for `coach_email` field
-  - Backend function for weekly email sending (separate service)
-
-**Customer Support** (`app/settings/support.tsx`)
-
-- RevenueCat Customer Center integration
-- Implementation needed:
-  - `react-native-purchases` integration
-  - Customer Center UI component
-
 #### 2. Exercises Screen
 
 All exercise implementations are missing:
-
-**Box Breathing** (`app/exercises/box-breathing.tsx`)
-
-- Breathing animation/visualization
-- Timer functionality
-- Session tracking
 
 **Visualization** (`app/exercises/visualization.tsx`)
 
@@ -120,59 +63,13 @@ All exercise implementations are missing:
 - Audio playback (optional)
 - Session tracking
 
-**Objective Review** (`app/exercises/objective-review.tsx`)
-
-- Text input for venting
-- AI reframing integration (OpenRouter API)
-- Side-by-side comparison view
-- Save to training cues functionality
-- History view
-- Implementation needed:
-  - `services/openrouter.ts` - Already exists, needs integration
-  - `utils/objectiveReview.ts` - Reframing logic
-  - History storage in Supabase
-
-**External Anchor** (`app/exercises/external-anchor.tsx`)
-
-- Grounding exercise flow
-- Session tracking
-
 #### 3. Trends Screen Enhancements
-
-**AI Trend Analysis** (`app/trends/ai.tsx`)
-
-- Partially implemented but needs:
-  - Proper data aggregation
-  - OpenRouter integration completion
-  - Loading states
-  - Error handling
-  - Insufficient data handling
-
-**Chart Selection** (`app/trends/chart-selection.tsx`)
-
-- Already exists but needs:
-  - Persistent storage of selections
-  - Better UI/UX
 
 **Time Frame Selection**
 
 - Already exists but needs:
   - Persistent storage
   - Better integration with data fetching
-
-**Detailed Graph Views** (`app/trends/[id].tsx`)
-
-- Partially implemented but needs:
-  - Full graph detail view
-  - Trend analysis
-  - Zone indicators
-  - Descriptive text generation
-
-**Oura/Whoop Integration**
-
-- Data fetching from connected services
-- Chart generation for wearable data
-- Conditional display based on connection status
 
 #### 4. Onboarding Flow
 
