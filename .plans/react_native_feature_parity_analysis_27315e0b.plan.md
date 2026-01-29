@@ -13,7 +13,7 @@ todos:
     status: pending
   - id: onboarding
     content: Create onboarding flow for new users
-    status: pending
+    status: completed
   - id: analytics
     content: Set up PostHog analytics integration throughout the app
     status: pending
