@@ -80,22 +80,33 @@ export default function VisualizationScreen() {
 
   // Check for cached version when inputs change
   useEffect(() => {
+    let cancelled = false;
+
     async function checkCache() {
       const key = getCacheKey(movement, cues, selectedVoice.id);
       const audioPath = `${CACHE_DIR}${key}.mp3`;
       const info = await FileSystem.getInfoAsync(audioPath);
-      setHasCachedVersion(info.exists);
-      if (!info.exists) {
-        setUseCachedVersion(false);
+
+      // Only update state if not cancelled
+      if (!cancelled) {
+        setHasCachedVersion(info.exists);
+        if (!info.exists) {
+          setUseCachedVersion(false);
+        }
       }
     }
+
     if (movement && cues) {
       checkCache();
     } else {
       setHasCachedVersion(false);
       setUseCachedVersion(false);
     }
-  }, [movement, cues, selectedVoice]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [movement, cues, selectedVoice.id]);
 
   function getCacheKey(mov: string, c: string, voiceId: string): string {
     const combined = `${mov}_${c}_${voiceId}`;
@@ -152,20 +163,26 @@ Generate only the script text, no titles or headers. Start directly with the vis
     const audioPath = `${CACHE_DIR}${key}.mp3`;
     const scriptPath = `${CACHE_DIR}${key}.txt`;
 
-    // Check if using cached version
+    // Check if using cached version - verify both audio AND script exist
     if (useCachedVersion) {
-      const audioInfo = await FileSystem.getInfoAsync(audioPath);
-      if (audioInfo.exists) {
+      const [audioInfo, scriptInfo] = await Promise.all([
+        FileSystem.getInfoAsync(audioPath),
+        FileSystem.getInfoAsync(scriptPath),
+      ]);
+
+      // Only use cache if both files exist and script is readable
+      if (audioInfo.exists && scriptInfo.exists) {
         try {
           const cachedScript = await FileSystem.readAsStringAsync(scriptPath);
           setGeneratedScript(cachedScript);
+          setAudioUri(audioPath);
+          setScreenState('player');
+          return;
         } catch {
-          setGeneratedScript('');
+          // Script read failed, fall through to regeneration
         }
-        setAudioUri(audioPath);
-        setScreenState('player');
-        return;
       }
+      // If we get here, cached files are missing or unreadable - fall through to regeneration
     }
 
     setScreenState('generating');
