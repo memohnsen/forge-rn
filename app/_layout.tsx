@@ -1,4 +1,5 @@
 import { SplashScreen } from '@/components/SplashScreen';
+import { RevenueCatProvider, useRevenueCatContext } from '@/contexts/RevenueCatContext';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import {
   identifyUser,
@@ -40,6 +41,7 @@ if (!publishableKey) {
 
 function InitialLayout() {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
+  const { hasProAccess, isEntitlementsLoading, isRevenueCatEnabled } = useRevenueCatContext();
   const segments = useSegments();
   const router = useRouter();
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
@@ -160,7 +162,13 @@ function InitialLayout() {
       if (hasCompletedOnboarding === false) {
         setTargetGroup('(onboarding)');
       } else if (hasCompletedOnboarding === true) {
-        setTargetGroup('(tabs)');
+        if (!isRevenueCatEnabled) {
+          setTargetGroup('(tabs)');
+        } else if (isEntitlementsLoading) {
+          setTargetGroup(null);
+        } else {
+          setTargetGroup(hasProAccess ? '(tabs)' : '(paywall)');
+        }
       } else {
         setTargetGroup(null);
       }
@@ -172,11 +180,14 @@ function InitialLayout() {
       }
     }
   }, [
-    isLoaded,
-    isSignedIn,
-    isCheckingOnboarding,
     hasCompletedOnboarding,
     hasCompletedPreAuthOnboarding,
+    hasProAccess,
+    isCheckingOnboarding,
+    isEntitlementsLoading,
+    isLoaded,
+    isRevenueCatEnabled,
+    isSignedIn,
   ]);
 
   useEffect(() => {
@@ -185,6 +196,7 @@ function InitialLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inTabsGroup = segments[0] === '(tabs)';
+    const inPaywallGroup = segments[0] === '(paywall)';
     const inAuthedGroup =
       segments[0] === '(tabs)' ||
       segments[0] === 'check-in' ||
@@ -200,6 +212,8 @@ function InitialLayout() {
       if (!inAuthGroup) router.replace('/(auth)/sign-in');
     } else if (targetGroup === '(onboarding)') {
       if (!inOnboardingGroup) router.replace('/(onboarding)');
+    } else if (targetGroup === '(paywall)') {
+      if (!inPaywallGroup) router.replace('/(paywall)');
     } else if (targetGroup === '(tabs)') {
       if (!inAuthedGroup) router.replace('/(tabs)');
     }
@@ -207,6 +221,7 @@ function InitialLayout() {
     if (
       (targetGroup === '(auth)' && inAuthGroup) ||
       (targetGroup === '(onboarding)' && inOnboardingGroup) ||
+      (targetGroup === '(paywall)' && inPaywallGroup) ||
       (targetGroup === '(tabs)' && inAuthedGroup)
     ) {
       setRouteReady(true);
@@ -243,13 +258,17 @@ function InitialLayout() {
     lastTabRef.current = currentTab;
   }, [segments]);
 
-  const showSplashOverlay = !isLoaded || isCheckingOnboarding || !splashMinDone || !routeReady;
+  const isCheckingSubscription =
+    isSignedIn && hasCompletedOnboarding === true && isRevenueCatEnabled && isEntitlementsLoading;
+  const showSplashOverlay =
+    !isLoaded || isCheckingOnboarding || isCheckingSubscription || !splashMinDone || !routeReady;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(onboarding)" />
+        <Stack.Screen name="(paywall)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="check-in" options={{ presentation: 'card' }} />
         <Stack.Screen name="workout" options={{ presentation: 'card' }} />
@@ -272,7 +291,9 @@ export default function RootLayout() {
   const content = (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
       <ClerkLoaded>
-        <InitialLayout />
+        <RevenueCatProvider>
+          <InitialLayout />
+        </RevenueCatProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );
