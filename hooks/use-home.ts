@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { User } from '@/models/User';
@@ -13,13 +13,18 @@ const STREAK_GRAY = '#8E8E93';
 
 export const useHome = () => {
   const { getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   // Create Supabase client with Clerk JWT
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
+      return getTokenRef.current({ template: 'supabase', skipCache: true });
     });
-  }, [getToken]);
+  }, []);
 
   const [users, setUsers] = useState<User[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);

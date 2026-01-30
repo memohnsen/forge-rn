@@ -127,7 +127,7 @@ export default function SettingsScreen() {
             title="Notifications"
             accentColor="#FFA050"
             isDark={isDark}
-            onPress={() => Alert.alert('Coming soon', 'Notifications settings are next.')}
+            onPress={() => router.push('/settings/notifications')}
           />
           <SettingsRow
             icon="link-variant"

@@ -2,9 +2,6 @@
 name: React Native Feature Parity Analysis
 overview: Compare the React Native app with the Swift app to identify missing features and create an implementation plan for feature parity.
 todos:
-  - id: notifications
-    content: "Implement notification settings: training schedule management, permission handling, and notification scheduling"
-    status: pending
   - id: revenuecat
     content: Implement RevenueCat pay wall to end of onboarding
     status: pending
@@ -30,22 +27,6 @@ The Swift app is the reference implementation with full feature set. The React N
 - History viewing
 
 ### ❌ Missing in React Native App
-
-#### 1. Settings Features
-
-**Notification Settings** (`app/settings/notifications.tsx`)
-
-- Training schedule management (select days of week + times)
-- Enable/disable notifications toggle
-- Check-in reminders (scheduled based on training days)
-- Session reflection reminders (scheduled after training time)
-- Competition reminders (scheduled before meet date)
-- Notification permission handling
-- Implementation needed:
-  - `utils/notificationManager.ts` - Notification scheduling logic
-  - `hooks/use-notifications.ts` - Notification state management
-  - Training days storage/retrieval from Supabase
-  - Integration with `expo-notifications`
 
 #### 5. Additional Features
 
@@ -77,14 +58,6 @@ The Swift app is the reference implementation with full feature set. The React N
 
 ## Implementation Priority
 
-### High Priority
-
-1. Notification Settings (core functionality)
-
-### Medium Priority
-
-10. Analytics integration
-
 ### Low Priority
 
 11. Widget support
@@ -94,57 +67,8 @@ The Swift app is the reference implementation with full feature set. The React N
 
 ### New Packages
 
-- `expo-notifications` - Already installed, needs implementation
-- `expo-sharing` or `expo-file-system` - For CSV export
 - `expo-linking` - Already installed, needs OAuth deep linking setup
 - `react-native-purchases` - Already installed, needs implementation
-- `posthog-react-native` - Already installed, needs implementation
-
-### Backend Requirements
-
-- Supabase Edge Functions for:
-  - Oura token exchange
-  - Whoop token exchange
-  - Weekly email sending
-  - Oura/Whoop webhook handlers
-
-### Environment Variables Needed
-
-- `EXPO_PUBLIC_OURA_CLIENT_ID`
-- `EXPO_PUBLIC_WHOOP_CLIENT_ID`
-- `EXPO_PUBLIC_POSTHOG_KEY`
-- `EXPO_PUBLIC_REVENUECAT_API_KEY`
-
-## File Structure to Create
-
-```
-app/
-  settings/
-    notifications.tsx
-    connected-apps.tsx
-    export.tsx
-    auto-send.tsx
-    support.tsx
-  exercises/
-    box-breathing.tsx
-    visualization.tsx
-    objective-review.tsx
-    external-anchor.tsx
-  onboarding.tsx
-
-utils/
-  notificationManager.ts
-  csvExport.ts
-  objectiveReview.ts
-  analytics.ts
-
-services/
-  oura.ts
-  whoop.ts
-
-hooks/
-  use-notifications.ts
-```
 
 ## Notes
 
