@@ -5,6 +5,7 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
+import { useRevenueCatContext } from '@/contexts/RevenueCatContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { User } from '@/models/User';
 import { createClerkSupabaseClient } from '@/services/supabase';
@@ -133,6 +134,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId, getToken } = useAuth();
+  const { hasProAccess, isRevenueCatEnabled, refreshCustomerInfo } = useRevenueCatContext();
 
   const { data, currentPage, updateData, nextPage, prevPage, totalPages } = useOnboarding();
 
@@ -271,7 +273,13 @@ export default function OnboardingScreen() {
       setOnboardingCompleted(true);
       trackMeetDaysUpdated(Object.keys(data.trainingDays).length);
 
-      router.replace('/(tabs)');
+      if (!isRevenueCatEnabled) {
+        router.replace('/(tabs)');
+        return;
+      }
+
+      const hasAccess = hasProAccess || (await refreshCustomerInfo());
+      router.replace(hasAccess ? '/(tabs)' : '/(paywall)');
     } catch (err: unknown) {
       console.error('Error completing onboarding:', err);
       const message =

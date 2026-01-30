@@ -1,11 +1,6 @@
 ---
 name: React Native Feature Parity Analysis
 overview: Compare the React Native app with the Swift app to identify missing features and create an implementation plan for feature parity.
-todos:
-  - id: revenuecat
-    content: Implement RevenueCat pay wall to end of onboarding
-    status: pending
-isProject: false
 ---
 
 # React Native vs Swift App Feature Comparison
@@ -26,14 +21,6 @@ The Swift app is the reference implementation with full feature set. The React N
   - Native module or separate widget app
   - Shared data storage (App Groups)
 
-**RevenueCat Integration**
-
-- Subscription management
-- Entitlement checking
-- Implementation needed:
-  - `react-native-purchases` setup
-  - Entitlement checking utilities
-  - Paywall UI (if needed)
 
 ## Implementation Priority
 
