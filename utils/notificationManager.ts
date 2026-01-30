@@ -65,23 +65,6 @@ function parseMeetDate(dateString: string): Date | null {
   return parsed;
 }
 
-function getDaysUntilMeet(meetDate?: string): number | null {
-  const date = parseMeetDate(meetDate ?? '');
-  if (!date) return null;
-
-  const today = new Date();
-  const diffTime = date.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function getSessionsLeft(daysUntilMeet: number, trainingDays: TrainingDays) {
-  const trainingDaysPerWeek = Object.keys(trainingDays).length;
-  if (daysUntilMeet <= 0 || trainingDaysPerWeek === 0) return 0;
-
-  const weeksRemaining = Math.max(0, daysUntilMeet / 7);
-  return Math.ceil(weeksRemaining * trainingDaysPerWeek);
-}
-
 async function syncWidgetData(params: {
   meetDate?: string;
   meetName?: string;
@@ -104,14 +87,12 @@ async function syncWidgetData(params: {
   }
 
   const normalizedMeetDate = formatToISO(parsedMeetDate);
-  const daysUntilMeet = getDaysUntilMeet(meetDate) ?? 0;
-  const sessionsLeft = getSessionsLeft(daysUntilMeet, params.trainingDays ?? {});
+  const trainingDaysPerWeek = Object.keys(params.trainingDays ?? {}).length;
 
   await updateJournalWidget({
     meetName,
     meetDate: normalizedMeetDate,
-    daysUntilMeet,
-    sessionsLeft,
+    trainingDaysPerWeek,
   });
 }
 

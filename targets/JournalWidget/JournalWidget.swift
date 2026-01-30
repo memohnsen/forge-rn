@@ -23,24 +23,32 @@ struct Provider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
         let sharedDefaults = UserDefaults(suiteName: "group.com.memohnsen.forge.JournalWidget")
+        let meetDate = sharedDefaults?.string(forKey: "meetDate") ?? ""
+        let trainingDaysPerWeek = sharedDefaults?.integer(forKey: "trainingDaysPerWeek") ?? 0
+        let daysUntilMeet = calculateDaysUntilMeet(meetDate)
+        let sessionsLeft = calculateSessionsLeft(daysUntilMeet: daysUntilMeet, trainingDaysPerWeek: trainingDaysPerWeek)
         let entry = SimpleEntry(
             date: Date(),
             meetName: sharedDefaults?.string(forKey: "meetName") ?? "No Meet Coming Up",
-            meetDate: sharedDefaults?.string(forKey: "meetDate") ?? "",
-            daysUntilMeet: sharedDefaults?.integer(forKey: "daysUntilMeet") ?? 0,
-            sessionsLeft: sharedDefaults?.integer(forKey: "sessionsLeft") ?? 0
+            meetDate: meetDate,
+            daysUntilMeet: daysUntilMeet,
+            sessionsLeft: sessionsLeft
         )
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         let sharedDefaults = UserDefaults(suiteName: "group.com.memohnsen.forge.JournalWidget")
+        let meetDate = sharedDefaults?.string(forKey: "meetDate") ?? ""
+        let trainingDaysPerWeek = sharedDefaults?.integer(forKey: "trainingDaysPerWeek") ?? 0
+        let daysUntilMeet = calculateDaysUntilMeet(meetDate)
+        let sessionsLeft = calculateSessionsLeft(daysUntilMeet: daysUntilMeet, trainingDaysPerWeek: trainingDaysPerWeek)
         let entry = SimpleEntry(
             date: Date(),
             meetName: sharedDefaults?.string(forKey: "meetName") ?? "No Meet Coming Up",
-            meetDate: sharedDefaults?.string(forKey: "meetDate") ?? "",
-            daysUntilMeet: sharedDefaults?.integer(forKey: "daysUntilMeet") ?? 0,
-            sessionsLeft: sharedDefaults?.integer(forKey: "sessionsLeft") ?? 0
+            meetDate: meetDate,
+            daysUntilMeet: daysUntilMeet,
+            sessionsLeft: sessionsLeft
         )
         
         let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date())!
@@ -65,6 +73,30 @@ func dateFormat(_ dateString: String) -> String? {
     let outputFormatter = DateFormatter()
     outputFormatter.dateFormat = "MMM d, yyyy"
     return outputFormatter.string(from: date)
+}
+
+func parseMeetDate(_ dateString: String) -> Date? {
+    if dateString.isEmpty { return nil }
+    let inputFormatter = DateFormatter()
+    inputFormatter.dateFormat = "yyyy-MM-dd"
+    if let date = inputFormatter.date(from: dateString) {
+        return date
+    }
+    return DateFormatter().date(from: dateString)
+}
+
+func calculateDaysUntilMeet(_ dateString: String) -> Int {
+    guard let date = parseMeetDate(dateString) else { return 0 }
+    let calendar = Calendar.current
+    let startOfToday = calendar.startOfDay(for: Date())
+    let startOfMeet = calendar.startOfDay(for: date)
+    return calendar.dateComponents([.day], from: startOfToday, to: startOfMeet).day ?? 0
+}
+
+func calculateSessionsLeft(daysUntilMeet: Int, trainingDaysPerWeek: Int) -> Int {
+    if daysUntilMeet <= 0 || trainingDaysPerWeek <= 0 { return 0 }
+    let weeksRemaining = Double(daysUntilMeet) / 7.0
+    return Int(ceil(weeksRemaining * Double(trainingDaysPerWeek)))
 }
 
 func daysUntilMeetText(_ days: Int) -> String {

@@ -9,8 +9,7 @@ const storage = Platform.OS === 'ios' ? new ExtensionStorage(APP_GROUP_ID) : nul
 export type JournalWidgetPayload = {
   meetName: string;
   meetDate: string;
-  daysUntilMeet: number;
-  sessionsLeft: number;
+  trainingDaysPerWeek: number;
 };
 
 export async function updateJournalWidget(data: JournalWidgetPayload) {
@@ -19,8 +18,7 @@ export async function updateJournalWidget(data: JournalWidgetPayload) {
   try {
     storage.set('meetName', data.meetName);
     storage.set('meetDate', data.meetDate);
-    storage.set('daysUntilMeet', data.daysUntilMeet);
-    storage.set('sessionsLeft', data.sessionsLeft);
+    storage.set('trainingDaysPerWeek', data.trainingDaysPerWeek);
     ExtensionStorage.reloadWidget(WIDGET_KIND);
   } catch (error) {
     console.warn('[widgetStorage] Failed to update widget data', error);
@@ -33,8 +31,7 @@ export async function clearJournalWidget() {
   try {
     storage.set('meetName', undefined);
     storage.set('meetDate', undefined);
-    storage.set('daysUntilMeet', undefined);
-    storage.set('sessionsLeft', undefined);
+    storage.set('trainingDaysPerWeek', undefined);
     ExtensionStorage.reloadWidget(WIDGET_KIND);
   } catch (error) {
     console.warn('[widgetStorage] Failed to clear widget data', error);
