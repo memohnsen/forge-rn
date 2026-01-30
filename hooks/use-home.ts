@@ -6,6 +6,7 @@ import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { StreakData } from '@/models/Streak';
 import streakManager from '@/utils/streakManager';
+import { notificationManager } from '@/utils/notificationManager';
 
 const STREAK_ORANGE = '#FF9500';
 const STREAK_RED = '#FF453A';
@@ -231,6 +232,11 @@ export const useHome = () => {
             .upsert(cleanedPayload, { onConflict: 'user_id' });
 
           if (error) throw error;
+          if (meetDate && meetName) {
+            await notificationManager.storeMeetData(meetDate, meetName);
+          } else {
+            await notificationManager.clearMeetData();
+          }
           return true;
         }
 
@@ -243,6 +249,12 @@ export const useHome = () => {
           .eq('user_id', userId);
 
         if (error) throw error;
+
+        if (meetDate && meetName) {
+          await notificationManager.storeMeetData(meetDate, meetName);
+        } else {
+          await notificationManager.clearMeetData();
+        }
         return true;
       } catch (err) {
         console.error('Error updating user meet:', err);

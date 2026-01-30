@@ -1,4 +1,5 @@
 const IS_DEV = process.env.APP_VARIANT === 'development';
+const APP_GROUP = 'group.com.memohnsen.forge.JournalWidget';
 
 export default {
   expo: {
@@ -12,8 +13,12 @@ export default {
     newArchEnabled: true,
     ios: {
       supportsTablet: false,
+      appleTeamId: "HCK9FFW6UX",
       bundleIdentifier: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',
-      icon: "./assets/images/icon.icon"
+      icon: "./assets/images/icon.icon",
+      entitlements: {
+        "com.apple.security.application-groups": [APP_GROUP]
+      }
     },
     android: {
       package: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',
@@ -33,6 +38,7 @@ export default {
     },
     plugins: [
       "expo-router",
+      "@bacons/apple-targets",
       [
         "expo-splash-screen",
         {

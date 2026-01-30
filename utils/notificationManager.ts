@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { formatToISO } from '@/utils/dateFormatter';
+import { clearJournalWidget, updateJournalWidget } from '@/utils/widgetStorage';
 
 const STORAGE_KEYS = {
   enabled: 'notifications_enabled_v1',
@@ -61,6 +63,56 @@ function parseMeetDate(dateString: string): Date | null {
   const parsed = new Date(dateString);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+function getDaysUntilMeet(meetDate?: string): number | null {
+  const date = parseMeetDate(meetDate ?? '');
+  if (!date) return null;
+
+  const today = new Date();
+  const diffTime = date.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getSessionsLeft(daysUntilMeet: number, trainingDays: TrainingDays) {
+  const trainingDaysPerWeek = Object.keys(trainingDays).length;
+  if (daysUntilMeet <= 0 || trainingDaysPerWeek === 0) return 0;
+
+  const weeksRemaining = Math.max(0, daysUntilMeet / 7);
+  return Math.ceil(weeksRemaining * trainingDaysPerWeek);
+}
+
+async function syncWidgetData(params: {
+  meetDate?: string;
+  meetName?: string;
+  trainingDays?: TrainingDays;
+}) {
+  if (Platform.OS !== 'ios') return;
+
+  const meetDate = params.meetDate;
+  const meetName = params.meetName;
+
+  if (!meetDate || !meetName) {
+    await clearJournalWidget();
+    return;
+  }
+
+  const parsedMeetDate = parseMeetDate(meetDate);
+  if (!parsedMeetDate) {
+    await clearJournalWidget();
+    return;
+  }
+
+  const normalizedMeetDate = formatToISO(parsedMeetDate);
+  const daysUntilMeet = getDaysUntilMeet(meetDate) ?? 0;
+  const sessionsLeft = getSessionsLeft(daysUntilMeet, params.trainingDays ?? {});
+
+  await updateJournalWidget({
+    meetName,
+    meetDate: normalizedMeetDate,
+    daysUntilMeet,
+    sessionsLeft,
+  });
 }
 
 function getPermissionGranted(settings: Notifications.NotificationPermissionsStatus) {
@@ -177,15 +229,24 @@ export const notificationManager = {
 
   async storeTrainingDays(trainingDays: TrainingDays) {
     await AsyncStorage.setItem(STORAGE_KEYS.trainingDays, JSON.stringify(trainingDays));
+    const meetData = await this.getMeetData();
+    await syncWidgetData({
+      meetDate: meetData.meetDate,
+      meetName: meetData.meetName,
+      trainingDays,
+    });
   },
 
   async storeMeetData(meetDate: string, meetName: string) {
     await AsyncStorage.setItem(STORAGE_KEYS.meetDate, meetDate);
     await AsyncStorage.setItem(STORAGE_KEYS.meetName, meetName);
+    const trainingDays = await this.getTrainingDays();
+    await syncWidgetData({ meetDate, meetName, trainingDays });
   },
 
   async clearMeetData() {
     await AsyncStorage.multiRemove([STORAGE_KEYS.meetDate, STORAGE_KEYS.meetName]);
+    await clearJournalWidget();
   },
 
   async getMeetData() {
