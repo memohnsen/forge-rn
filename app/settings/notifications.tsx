@@ -66,9 +66,12 @@ function parseTimeString(timeString: string): { hour: number; minute: number } |
   const meridiem = match[3].toUpperCase();
 
   if (Number.isNaN(hourRaw) || Number.isNaN(minute)) return null;
+  if (hourRaw < 1 || hourRaw > 12) return null;
+  if (minute < 0 || minute > 59) return null;
 
   let hour = hourRaw % 12;
   if (meridiem === 'PM') hour += 12;
+  if (hour < 0 || hour > 23) return null;
 
   return { hour, minute };
 }
@@ -143,10 +146,26 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => {
-    if (user?.next_competition_date && user?.next_competition) {
-      updateMeetData(user.next_competition_date, user.next_competition);
-      rescheduleNotifications();
-    }
+    let isActive = true;
+
+    (async () => {
+      const meetDate = user?.next_competition_date;
+      const meetName = user?.next_competition;
+
+      if (meetDate && meetName) {
+        await updateMeetData(meetDate, meetName);
+      } else {
+        await updateMeetData(undefined, undefined);
+      }
+
+      if (isActive) {
+        await rescheduleNotifications();
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
   }, [rescheduleNotifications, updateMeetData, user?.next_competition, user?.next_competition_date]);
 
   useEffect(() => {
