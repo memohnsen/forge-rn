@@ -12,7 +12,8 @@ export default {
     newArchEnabled: true,
     ios: {
       supportsTablet: false,
-      bundleIdentifier: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge'
+      bundleIdentifier: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',
+      icon: "./assets/images/icon.icon"
     },
     android: {
       package: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',

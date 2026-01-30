@@ -538,23 +538,21 @@ export default function OnboardingScreen() {
               </Text>
             </View>
 
-            <View style={styles.daysContainer}>
-              {/* First row - 4 days */}
-              <View style={styles.daysRow}>
-                {weekDays.slice(0, 4).map((day) => {
-                  const isSelected = !!data.trainingDays[day];
-                  return (
+            <View style={styles.daysList}>
+              {weekDays.map((day) => {
+                const isSelected = !!data.trainingDays[day];
+                return (
+                  <View key={day} style={styles.dayRow}>
                     <Pressable
-                      key={day}
                       style={[
                         styles.dayButton,
                         {
                           backgroundColor: isSelected
                             ? colors.blueEnergy
                             : isDark
-                              ? '#2A2A2A'
-                              : '#F0F0F0',
-                          borderColor: isSelected ? colors.blueEnergy : 'transparent',
+                              ? 'rgba(83, 134, 228, 0.15)'
+                              : 'rgba(83, 134, 228, 0.12)',
+                          borderColor: isSelected ? 'transparent' : 'rgba(83, 134, 228, 0.3)',
                         },
                       ]}
                       onPress={() => toggleTrainingDay(day)}
@@ -562,74 +560,37 @@ export default function OnboardingScreen() {
                       <Text
                         style={[
                           styles.dayText,
-                          { color: isSelected ? '#FFFFFF' : isDark ? '#AAAAAA' : '#666666' },
+                          { color: isSelected ? '#FFFFFF' : colors.blueEnergy },
                         ]}
                       >
-                        {day.slice(0, 3)}
+                        {day}
                       </Text>
                     </Pressable>
-                  );
-                })}
-              </View>
-              {/* Second row - 3 days */}
-              <View style={styles.daysRow}>
-                {weekDays.slice(4).map((day) => {
-                  const isSelected = !!data.trainingDays[day];
-                  return (
-                    <Pressable
-                      key={day}
-                      style={[
-                        styles.dayButton,
-                        {
-                          backgroundColor: isSelected
-                            ? colors.blueEnergy
-                            : isDark
-                              ? '#2A2A2A'
-                              : '#F0F0F0',
-                          borderColor: isSelected ? colors.blueEnergy : 'transparent',
-                        },
-                      ]}
-                      onPress={() => toggleTrainingDay(day)}
-                    >
-                      <Text
-                        style={[
-                          styles.dayText,
-                          { color: isSelected ? '#FFFFFF' : isDark ? '#AAAAAA' : '#666666' },
-                        ]}
-                      >
-                        {day.slice(0, 3)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
 
-            {Object.keys(data.trainingDays).length > 0 && (
-              <View style={styles.selectedDaysContainer}>
-                <Text style={[styles.selectedDaysTitle, { color: isDark ? '#AAAAAA' : '#666666' }]}>
-                  Training Times:
-                </Text>
-                {Object.entries(data.trainingDays).map(([day, time]) => (
-                  <Pressable
-                    key={day}
-                    style={[
-                      styles.selectedDayRow,
-                      { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' },
-                    ]}
-                    onPress={() => setSelectedDayForTime(day)}
-                  >
-                    <Text style={[styles.selectedDayText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-                      {day}
-                    </Text>
-                    <Text style={[styles.selectedTimeText, { color: colors.blueEnergy }]}>
-                      {time}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.blueEnergy} />
-                  </Pressable>
-                ))}
-              </View>
-            )}
+                    {isSelected ? (
+                      <Pressable
+                        style={[
+                          styles.timeButton,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(83, 134, 228, 0.15)'
+                              : 'rgba(83, 134, 228, 0.12)',
+                            borderColor: 'rgba(83, 134, 228, 0.3)',
+                          },
+                        ]}
+                        onPress={() => setSelectedDayForTime(day)}
+                      >
+                        <Text style={styles.timeButtonText}>{data.trainingDays[day]}</Text>
+                      </Pressable>
+                    ) : (
+                      <View style={styles.timePlaceholder}>
+                        <Text style={styles.timePlaceholderText}>Select time</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
           </View>
 
           <FormSubmitButton
@@ -917,50 +878,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  daysContainer: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  daysRow: {
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'flex-start',
-  },
-  dayButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-  },
-  dayText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  selectedDaysContainer: {
-    marginTop: 8,
-  },
-  selectedDaysTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  selectedDayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
+  daysList: {
+    gap: 12,
     marginBottom: 8,
   },
-  selectedDayText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  selectedTimeText: {
-    fontSize: 15,
+  dayButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    minWidth: 110,
+  },
+  dayText: {
+    fontSize: 13,
     fontWeight: '600',
-    marginRight: 8,
+  },
+  timeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  timeButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.blueEnergy,
+  },
+  timePlaceholder: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 999,
+    alignItems: 'center',
+    backgroundColor: 'rgba(154, 154, 154, 0.1)',
+  },
+  timePlaceholderText: {
+    fontSize: 13,
+    color: '#9A9A9A',
   },
   timePickerOverlay: {
     position: 'absolute',

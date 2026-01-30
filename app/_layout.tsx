@@ -1,12 +1,5 @@
-import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { SplashScreen } from '@/components/SplashScreen';
-import { StyleSheet, View } from 'react-native';
-import Purchases from 'react-native-purchases';
-import { PostHogProvider } from 'posthog-react-native';
+import { createClerkSupabaseClient } from '@/services/supabase';
 import {
   identifyUser,
   posthog,
@@ -15,6 +8,12 @@ import {
   trackTabSwitched,
   trackUserSignedOut,
 } from '@/utils/analytics';
+import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { PostHogProvider } from 'posthog-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 const tokenCache = {
   async getToken(key: string) {
