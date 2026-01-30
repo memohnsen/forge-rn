@@ -186,19 +186,28 @@ function InitialLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
     const inTabsGroup = segments[0] === '(tabs)';
+    const inAuthedGroup =
+      segments[0] === '(tabs)' ||
+      segments[0] === 'check-in' ||
+      segments[0] === 'workout' ||
+      segments[0] === 'competition' ||
+      segments[0] === 'history' ||
+      segments[0] === 'trends' ||
+      segments[0] === 'exercises' ||
+      segments[0] === 'settings';
 
     if (targetGroup === '(auth)') {
       if (!inAuthGroup) router.replace('/(auth)/sign-in');
     } else if (targetGroup === '(onboarding)') {
       if (!inOnboardingGroup) router.replace('/(onboarding)');
     } else if (targetGroup === '(tabs)') {
-      if (!inTabsGroup) router.replace('/(tabs)');
+      if (!inAuthedGroup) router.replace('/(tabs)');
     }
 
     if (
       (targetGroup === '(auth)' && inAuthGroup) ||
       (targetGroup === '(onboarding)' && inOnboardingGroup) ||
-      (targetGroup === '(tabs)' && inTabsGroup)
+      (targetGroup === '(tabs)' && inAuthedGroup)
     ) {
       setRouteReady(true);
     } else {

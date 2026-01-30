@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   fetchOuraDailyData,
@@ -21,6 +21,11 @@ export function useWearableDataForDate(dateString: string) {
   const [data, setData] = useState<WearableDataForDate>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const getTokenRef = useRef(getToken);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const parseLocalDate = (value: string) => {
     const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -91,7 +96,7 @@ export function useWearableDataForDate(dateString: string) {
 
       const getClerkToken = async () => {
         try {
-          return await getToken({ template: 'supabase' });
+          return await getTokenRef.current({ template: 'supabase' });
         } catch (error) {
           console.warn('[useWearableDataForDate] Failed to get Clerk token:', error);
           return null;
@@ -134,7 +139,7 @@ export function useWearableDataForDate(dateString: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, dateString, getToken]);
+  }, [userId, dateString]);
 
   useEffect(() => {
     fetchData();
@@ -153,6 +158,11 @@ export function useWearableConnectionStatus() {
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const getTokenRef = useRef(getToken);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const checkStatus = useCallback(async () => {
     if (!userId) {
@@ -166,7 +176,7 @@ export function useWearableConnectionStatus() {
     try {
       const getClerkToken = async () => {
         try {
-          return await getToken({ template: 'supabase' });
+          return await getTokenRef.current({ template: 'supabase' });
         } catch (error) {
           console.warn('[useWearableConnectionStatus] Failed to get Clerk token:', error);
           return null;
@@ -186,7 +196,7 @@ export function useWearableConnectionStatus() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, getToken]);
+  }, [userId]);
 
   useEffect(() => {
     checkStatus();
