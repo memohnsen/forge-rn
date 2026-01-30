@@ -6,6 +6,7 @@ import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { StreakData } from '@/models/Streak';
 import streakManager from '@/utils/streakManager';
+import { notificationManager } from '@/utils/notificationManager';
 
 const STREAK_ORANGE = '#FF9500';
 const STREAK_RED = '#FF453A';
@@ -231,6 +232,19 @@ export const useHome = () => {
             .upsert(cleanedPayload, { onConflict: 'user_id' });
 
           if (error) throw error;
+          if (meetDate && meetName) {
+            try {
+              await notificationManager.storeMeetData(meetDate, meetName);
+            } catch (notificationError) {
+              console.error('[useHome] Failed to sync meet data to notifications', notificationError);
+            }
+          } else {
+            try {
+              await notificationManager.clearMeetData();
+            } catch (notificationError) {
+              console.error('[useHome] Failed to clear meet data in notifications', notificationError);
+            }
+          }
           return true;
         }
 
@@ -243,6 +257,20 @@ export const useHome = () => {
           .eq('user_id', userId);
 
         if (error) throw error;
+
+        if (meetDate && meetName) {
+          try {
+            await notificationManager.storeMeetData(meetDate, meetName);
+          } catch (notificationError) {
+            console.error('[useHome] Failed to sync meet data to notifications', notificationError);
+          }
+        } else {
+          try {
+            await notificationManager.clearMeetData();
+          } catch (notificationError) {
+            console.error('[useHome] Failed to clear meet data in notifications', notificationError);
+          }
+        }
         return true;
       } catch (err) {
         console.error('Error updating user meet:', err);
