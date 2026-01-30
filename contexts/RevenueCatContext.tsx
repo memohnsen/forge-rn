@@ -72,12 +72,11 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unable to load subscription status.';
       setErrorMessage(message);
-      setHasProAccess(false);
-      return false;
+      return hasProAccess;
     } finally {
       setIsEntitlementsLoading(false);
     }
-  }, [isRevenueCatEnabled, updateCustomerInfo, userId]);
+  }, [hasProAccess, isRevenueCatEnabled, updateCustomerInfo, userId]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -103,15 +102,30 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     setIsEntitlementsLoading(true);
-    SecureStore.getItemAsync(getCacheKey(userId))
-      .then((cached) => {
-        if (cached != null) {
+    let isActive = true;
+
+    (async () => {
+      try {
+        const cached = await SecureStore.getItemAsync(getCacheKey(userId));
+        if (isActive && cached != null) {
           setHasProAccess(cached === 'true');
         }
-      })
-      .catch(() => {});
+      } catch {
+        // Ignore cache read errors.
+      }
 
-    refreshCustomerInfo();
+      if (isActive) {
+        await refreshCustomerInfo();
+      }
+    })().finally(() => {
+      if (isActive) {
+        setIsEntitlementsLoading(false);
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, [getCacheKey, isLoaded, isRevenueCatEnabled, isSignedIn, refreshCustomerInfo, userId]);
 
   useEffect(() => {

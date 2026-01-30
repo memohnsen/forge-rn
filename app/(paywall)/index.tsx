@@ -5,13 +5,14 @@ import {
   trackSubscriptionStarted,
 } from '@/utils/analytics';
 import { useAuth } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import RevenueCatUI from 'react-native-purchases-ui';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const {
     hasProAccess,
@@ -21,6 +22,7 @@ export default function PaywallScreen() {
     updateCustomerInfo,
   } = useRevenueCatContext();
   const hasTrackedView = useRef(false);
+  const [dismissMessage, setDismissMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasTrackedView.current) {
@@ -75,14 +77,27 @@ export default function PaywallScreen() {
           onDismiss={() => {
             refreshCustomerInfo().then((hasAccess) => {
               if (hasAccess) {
-                router.replace('/(tabs)');
+                if (pathname !== '/(tabs)') {
+                  router.replace('/(tabs)');
+                }
               } else {
-                router.replace('/(paywall)');
+                if (pathname !== '/(paywall)') {
+                  router.replace('/(paywall)');
+                } else {
+                  setDismissMessage(
+                    'You need an active subscription to continue. Please try again when you are back online.'
+                  );
+                }
               }
             });
           }}
         />
       )}
+      {dismissMessage ? (
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>{dismissMessage}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -108,6 +123,20 @@ const styles = StyleSheet.create({
   fallbackText: {
     color: '#FFFFFF',
     fontSize: 16,
+    textAlign: 'center',
+  },
+  messageContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 24,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  messageText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     textAlign: 'center',
   },
 });

@@ -14,7 +14,7 @@ export const useRevenueCat = () => {
     if (!isLoaded) return;
     if (!revenueCatApiKey) {
       if (__DEV__) {
-        console.warn('[RevenueCat] Missing EXPO_PUBLIC_REVENUECAT_API_KEY');
+        console.warn('[RevenueCat] Missing EXPO_PUBLIC_REVENUECAT_KEY');
       }
       return;
     }
