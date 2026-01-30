@@ -8,9 +8,11 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -32,6 +34,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { userId } = useAuth();
   const { user: clerkUser } = useUser();
@@ -155,14 +158,34 @@ export default function HomeScreen() {
 
   const headerHeight = 80 + insets.top;
   const firstName = user?.first_name || clerkUser?.firstName || 'Athlete';
+  const profileInitial = (clerkUser?.firstName || firstName).charAt(0).toUpperCase();
 
   const HeaderContent = () => (
     <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-      <View style={styles.headerLeft}>
-        <Text style={styles.dateText}>{formattedToday}</Text>
-        <Text style={[styles.greetingText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-          Ready to train, {firstName}?
-        </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.dateText}>{formattedToday}</Text>
+          <Text style={[styles.greetingText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Ready to train, {firstName}?
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => router.push('/profile')}
+          style={[
+            styles.profileButton,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+        >
+          {clerkUser?.imageUrl ? (
+            <Image source={{ uri: clerkUser.imageUrl }} style={styles.profileAvatar} />
+          ) : (
+            <Text style={[styles.profileInitial, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              {profileInitial}
+            </Text>
+          )}
+        </Pressable>
       </View>
     </View>
   );
@@ -334,9 +357,31 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     justifyContent: 'flex-end',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+  },
   headerLeft: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  profileInitial: {
+    fontSize: 18,
+    fontWeight: '700',
   },
   dateText: {
     fontSize: 14,

@@ -16,19 +16,7 @@ The Swift app is the reference implementation with full feature set. The React N
 
 ## Feature Comparison Matrix
 
-### ✅ Implemented in Both Apps
-
-- Home screen with meet countdown, daily check-in section, reflection section, history section
-- Daily Check-In form (complete)
-- Session Reflection form (complete)
-- Competition Reflection form (complete)
-- Basic Trends screen with filters
-- Basic Settings screen structure
-- History viewing
-
 ### ❌ Missing in React Native App
-
-#### 5. Additional Features
 
 **Widget Support**
 
@@ -42,26 +30,16 @@ The Swift app is the reference implementation with full feature set. The React N
 
 - Subscription management
 - Entitlement checking
-- Customer Center
 - Implementation needed:
   - `react-native-purchases` setup
   - Entitlement checking utilities
   - Paywall UI (if needed)
-
-**User Profile View**
-
-- Profile editing
-- User avatar display
-- Implementation needed:
-  - Profile screen
-  - Avatar upload (if needed)
 
 ## Implementation Priority
 
 ### Low Priority
 
 11. Widget support
-13. User Profile View
 
 ## Technical Dependencies Needed
 
