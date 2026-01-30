@@ -193,7 +193,8 @@ function InitialLayout() {
       segments[0] === 'history' ||
       segments[0] === 'trends' ||
       segments[0] === 'exercises' ||
-      segments[0] === 'settings';
+      segments[0] === 'settings' ||
+      segments[0] === 'profile';
 
     if (targetGroup === '(auth)') {
       if (!inAuthGroup) router.replace('/(auth)/sign-in');
@@ -256,6 +257,7 @@ function InitialLayout() {
         <Stack.Screen name="history" options={{ presentation: 'card' }} />
         <Stack.Screen name="trends" options={{ presentation: 'card' }} />
         <Stack.Screen name="exercises" options={{ presentation: 'card' }} />
+        <Stack.Screen name="profile" options={{ presentation: 'card' }} />
       </Stack>
       {showSplashOverlay ? (
         <View style={styles.splashOverlay}>
