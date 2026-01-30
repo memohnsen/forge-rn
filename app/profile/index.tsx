@@ -1,4 +1,5 @@
 import { colors } from '@/constants/colors';
+import { createClerkSupabaseClient } from '@/services/supabase';
 import { trackScreenView } from '@/utils/analytics';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoaded, user } = useUser();
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -51,11 +52,45 @@ export default function ProfileScreen() {
     if (!user) return;
     setIsSaving(true);
     try {
+      const trimmedFirst = firstName.trim();
+      const trimmedLast = lastName.trim();
       await user.update({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: trimmedFirst,
+        lastName: trimmedLast,
       });
-      Alert.alert('Profile Updated', 'Your profile information has been saved.');
+
+      const supabase = createClerkSupabaseClient(async () => {
+        return getToken({ template: 'supabase', skipCache: true });
+      });
+
+      let supabaseSynced = true;
+      try {
+        const { data, error } = await supabase
+          .from('journal_users')
+          .update({
+            first_name: trimmedFirst,
+            last_name: trimmedLast,
+          })
+          .eq('user_id', user.id)
+          .select('user_id');
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          supabaseSynced = false;
+        }
+      } catch (error) {
+        supabaseSynced = false;
+        console.error('Failed to sync profile to Supabase:', error);
+      }
+
+      if (supabaseSynced) {
+        Alert.alert('Profile Updated', 'Your profile information has been saved.');
+      } else {
+        Alert.alert(
+          'Profile Updated',
+          'Your profile was saved, but we could not sync it yet. It should update shortly.'
+        );
+      }
     } catch (error) {
       console.error('Failed to update profile:', error);
       Alert.alert('Update Failed', 'Unable to update your profile. Please try again.');
