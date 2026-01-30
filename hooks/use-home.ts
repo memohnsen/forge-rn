@@ -233,9 +233,17 @@ export const useHome = () => {
 
           if (error) throw error;
           if (meetDate && meetName) {
-            await notificationManager.storeMeetData(meetDate, meetName);
+            try {
+              await notificationManager.storeMeetData(meetDate, meetName);
+            } catch (notificationError) {
+              console.error('[useHome] Failed to sync meet data to notifications', notificationError);
+            }
           } else {
-            await notificationManager.clearMeetData();
+            try {
+              await notificationManager.clearMeetData();
+            } catch (notificationError) {
+              console.error('[useHome] Failed to clear meet data in notifications', notificationError);
+            }
           }
           return true;
         }
@@ -251,9 +259,17 @@ export const useHome = () => {
         if (error) throw error;
 
         if (meetDate && meetName) {
-          await notificationManager.storeMeetData(meetDate, meetName);
+          try {
+            await notificationManager.storeMeetData(meetDate, meetName);
+          } catch (notificationError) {
+            console.error('[useHome] Failed to sync meet data to notifications', notificationError);
+          }
         } else {
-          await notificationManager.clearMeetData();
+          try {
+            await notificationManager.clearMeetData();
+          } catch (notificationError) {
+            console.error('[useHome] Failed to clear meet data in notifications', notificationError);
+          }
         }
         return true;
       } catch (err) {

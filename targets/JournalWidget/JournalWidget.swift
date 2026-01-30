@@ -51,7 +51,7 @@ struct Provider: TimelineProvider {
             sessionsLeft: sessionsLeft
         )
         
-        let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date())!
+        let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date().addingTimeInterval(3600)
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }
@@ -85,12 +85,22 @@ func parseMeetDate(_ dateString: String) -> Date? {
     return DateFormatter().date(from: dateString)
 }
 
-func calculateDaysUntilMeet(_ dateString: String) -> Int {
-    guard let date = parseMeetDate(dateString) else { return 0 }
+func calculateRawDaysUntilMeet(_ dateString: String) -> Int? {
+    guard let date = parseMeetDate(dateString) else { return nil }
     let calendar = Calendar.current
     let startOfToday = calendar.startOfDay(for: Date())
     let startOfMeet = calendar.startOfDay(for: date)
-    return calendar.dateComponents([.day], from: startOfToday, to: startOfMeet).day ?? 0
+    return calendar.dateComponents([.day], from: startOfToday, to: startOfMeet).day
+}
+
+func calculateDaysUntilMeet(_ dateString: String) -> Int {
+    let rawDays = calculateRawDaysUntilMeet(dateString) ?? 0
+    return max(0, rawDays)
+}
+
+func isMeetCompleted(_ dateString: String) -> Bool {
+    guard let rawDays = calculateRawDaysUntilMeet(dateString) else { return false }
+    return rawDays < 0
 }
 
 func calculateSessionsLeft(daysUntilMeet: Int, trainingDaysPerWeek: Int) -> Int {
@@ -99,8 +109,8 @@ func calculateSessionsLeft(daysUntilMeet: Int, trainingDaysPerWeek: Int) -> Int 
     return Int(ceil(weeksRemaining * Double(trainingDaysPerWeek)))
 }
 
-func daysUntilMeetText(_ days: Int) -> String {
-    if days < 0 {
+func daysUntilMeetText(_ days: Int, dateString: String) -> String {
+    if isMeetCompleted(dateString) {
         return "Completed"
     } else if days == 0 {
         return "Today!"
@@ -117,7 +127,7 @@ struct SmallMeetWidget: View {
             Text("\(entry.sessionsLeft)")
                 .font(.system(size: 56))
                 .bold()
-                .foregroundStyle(entry.daysUntilMeet < 0 ? .green : .blue)
+                .foregroundStyle(isMeetCompleted(entry.meetDate) ? .green : .blue)
             Text("Sessions Remaining")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -165,9 +175,9 @@ struct MediumMeetWidget: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     
-                    Text(daysUntilMeetText(entry.daysUntilMeet))
+                    Text(daysUntilMeetText(entry.daysUntilMeet, dateString: entry.meetDate))
                         .font(.title2.bold())
-                        .foregroundStyle(entry.daysUntilMeet < 0 ? .green : .blue)
+                        .foregroundStyle(isMeetCompleted(entry.meetDate) ? .green : .blue)
                 }
                 
                 Spacer()
