@@ -1,6 +1,6 @@
 const parseDateString = (dateString: string): Date | null => {
   if (!dateString) return null;
-  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
   if (isoMatch) {
     const year = Number(isoMatch[1]);
     const month = Number(isoMatch[2]);

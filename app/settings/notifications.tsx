@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { trackNotificationSettingsViewed } from '@/utils/analytics';
+import { formatDateShort } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
 
 const DAYS_OF_WEEK = [
@@ -95,21 +96,7 @@ function calculateSessionTime(timeString: string) {
 }
 
 function formatMeetDate(dateString: string) {
-  if (!dateString) return dateString;
-  const parsed = /^\\d{4}-\\d{2}-\\d{2}$/.test(dateString)
-    ? new Date(
-        Number(dateString.slice(0, 4)),
-        Number(dateString.slice(5, 7)) - 1,
-        Number(dateString.slice(8, 10))
-      )
-    : new Date(dateString);
-  if (Number.isNaN(parsed.getTime())) return dateString;
-
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDateShort(dateString) || dateString;
 }
 
 export default function NotificationsScreen() {

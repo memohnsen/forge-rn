@@ -1,4 +1,5 @@
 import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
 import { formatToISO } from '@/utils/dateFormatter';
@@ -143,18 +144,22 @@ export const isOuraConnected = async (userId: string): Promise<boolean> => {
 
 let currentAuthState: string | null = null;
 
-const generateRandomState = (): string => {
+const generateRandomState = async (): Promise<string> => {
   const array = new Uint8Array(16);
   const cryptoObj = globalThis.crypto;
-  if (!cryptoObj?.getRandomValues) {
-    throw new Error('Secure RNG unavailable');
+
+  if (cryptoObj?.getRandomValues) {
+    cryptoObj.getRandomValues(array);
+  } else {
+    const bytes = await Crypto.getRandomBytesAsync(array.length);
+    array.set(bytes);
   }
-  cryptoObj.getRandomValues(array);
+
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
-const buildAuthorizationURL = (): string => {
-  currentAuthState = generateRandomState();
+const buildAuthorizationURL = async (): Promise<string> => {
+  currentAuthState = await generateRandomState();
   const params = new URLSearchParams({
     client_id: OURA_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
@@ -197,7 +202,7 @@ export const authenticateOura = async (
       throw new Error('No Clerk token available');
     }
 
-    const authUrl = buildAuthorizationURL();
+    const authUrl = await buildAuthorizationURL();
     const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
 
     if (result.type !== 'success') {

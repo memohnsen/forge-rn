@@ -2,6 +2,8 @@ import React from 'react';
 import Svg, {
   ClipPath,
   Defs,
+  Filter,
+  FeGaussianBlur,
   G,
   LinearGradient as SvgLinearGradient,
   Path,
@@ -11,12 +13,27 @@ import Svg, {
 
 interface LogoSvgProps {
   size?: number;
+  tone?: 'color' | 'mono';
+  tintColor?: string;
+  blurRadius?: number;
 }
 
-export const LogoSvg: React.FC<LogoSvgProps> = ({ size = 140 }) => {
+export const LogoSvg: React.FC<LogoSvgProps> = ({
+  size = 140,
+  tone = 'color',
+  tintColor = '#FFFFFF',
+  blurRadius,
+}) => {
+  const isMono = tone === 'mono';
+  const blurId = 'logo-blur';
   return (
     <Svg width={size} height={size} viewBox="0 0 1024 1024">
       <Defs>
+        {typeof blurRadius === 'number' && blurRadius > 0 && (
+          <Filter id={blurId}>
+            <FeGaussianBlur stdDeviation={blurRadius} />
+          </Filter>
+        )}
         <ClipPath id="clippath">
           <Path
             fillRule="evenodd"
@@ -24,17 +41,19 @@ export const LogoSvg: React.FC<LogoSvgProps> = ({ size = 140 }) => {
             d="M219.52,180.3c42.4,9.29,84.82,18.59,127.22,27.9,42.41,9.31,84.81,18.64,127.26,27.96,38.8,8.53,70.57,44.79,70.57,80.57v388.4c0,35.79-31.77,71.98-70.57,80.5-42.45,9.33-84.85,18.65-127.26,27.97-42.4,9.31-84.82,18.61-127.22,27.89-38.81,8.5-70.53-23.6-70.53-71.36V251.6c0-47.76,31.72-79.8,70.53-71.3"
           />
         </ClipPath>
-        <SvgLinearGradient
-          id="linear-gradient"
-          x1="148.99"
-          y1="510.9"
-          x2="509.31"
-          y2="510.9"
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0" stopColor="#5386e4" />
-          <Stop offset="1" stopColor="#00215e" />
-        </SvgLinearGradient>
+        {!isMono && (
+          <SvgLinearGradient
+            id="linear-gradient"
+            x1="148.99"
+            y1="510.9"
+            x2="509.31"
+            y2="510.9"
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor="#5386e4" />
+            <Stop offset="1" stopColor="#00215e" />
+          </SvgLinearGradient>
+        )}
         <ClipPath id="clippath-1">
           <Path
             fillRule="evenodd"
@@ -42,57 +61,75 @@ export const LogoSvg: React.FC<LogoSvgProps> = ({ size = 140 }) => {
             d="M327.54,138.56c47.76,10.46,95.52,20.93,143.28,31.42,47.76,10.49,95.52,20.99,143.33,31.5,43.7,9.6,79.48,50.44,79.48,90.74v437.43c0,40.31-35.78,81.07-79.48,90.67-47.81,10.51-95.56,21.01-143.33,31.49-47.75,10.49-95.52,20.96-143.28,31.42-43.71,9.57-79.44-26.58-79.44-80.38V218.86c0-53.79,35.73-89.87,79.44-80.3"
           />
         </ClipPath>
-        <SvgLinearGradient
-          id="linear-gradient-2"
-          x1="248.11"
-          y1="510.9"
-          x2="653.87"
-          y2="510.9"
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0" stopColor="#5386e4" />
-          <Stop offset="1" stopColor="#00215e" />
-        </SvgLinearGradient>
+        {!isMono && (
+          <SvgLinearGradient
+            id="linear-gradient-2"
+            x1="248.11"
+            y1="510.9"
+            x2="653.87"
+            y2="510.9"
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor="#5386e4" />
+            <Stop offset="1" stopColor="#00215e" />
+          </SvgLinearGradient>
+        )}
       </Defs>
-      <G id="Layer_1">
+      <G id="Layer_1" filter={blurRadius ? `url(#${blurId})` : undefined}>
         <G>
           <G clipPath="url(#clippath)">
-            <Rect x="148.99" y="171.8" width="395.58" height="678.19" fill="url(#linear-gradient)" />
+            <Rect
+              x="148.99"
+              y="171.8"
+              width="395.58"
+              height="678.19"
+              fill={isMono ? tintColor : 'url(#linear-gradient)'}
+            />
           </G>
           <G clipPath="url(#clippath-1)">
-            <Rect x="248.11" y="128.99" width="445.52" height="763.82" fill="url(#linear-gradient-2)" />
+            <Rect
+              x="248.11"
+              y="128.99"
+              width="445.52"
+              height="763.82"
+              fill={isMono ? tintColor : 'url(#linear-gradient-2)'}
+            />
           </G>
           <Path
-            fill="#5386e4"
+            fill={isMono ? tintColor : '#5386e4'}
             fillRule="evenodd"
             d="M466.06,96.07c53.35,11.68,106.71,23.39,160.06,35.1,53.36,11.71,106.7,23.44,160.11,35.18,48.82,10.73,88.79,56.35,88.79,101.37v488.65c0,45.02-39.97,90.56-88.79,101.28-53.41,11.74-106.75,23.47-160.11,35.18-53.34,11.71-106.71,23.41-160.06,35.1-48.82,10.69-88.73-29.7-88.73-89.79V185.77c0-60.09,39.91-100.39,88.73-89.7"
           />
           <Path
-            fill="#fff"
+            fill={isMono ? tintColor : '#fff'}
             fillRule="evenodd"
             d="M739.43,440.06c16.78,0,30.39,32.21,30.39,71.94s-13.61,71.94-30.39,71.94h-19.72c16.78,0,30.39-32.21,30.39-71.94s-13.61-71.94-30.39-71.94h19.72Z"
           />
           <Path
-            fill="#fff"
+            fill={isMono ? tintColor : '#fff'}
             fillRule="evenodd"
             d="M710.45,405.66c24.81,0,44.92,47.61,44.92,106.35s-20.12,106.34-44.92,106.34h-29.15c24.81,0,44.92-47.61,44.92-106.34s-20.11-106.35-44.92-106.35h29.15Z"
           />
           <Path
-            fill="#fff"
+            fill={isMono ? tintColor : '#fff'}
             fillRule="evenodd"
             d="M507.03,422.55c20.87,0,37.79,40.05,37.79,89.45s-16.92,89.45-37.79,89.45h-24.52c20.87,0,37.79-40.05,37.79-89.45s-16.92-89.45-37.79-89.45h24.52Z"
           />
           <Path
-            fill="#fff"
+            fill={isMono ? tintColor : '#fff'}
             fillRule="evenodd"
             d="M544.79,391.34c28.15,0,50.97,54.02,50.97,120.67s-22.82,120.66-50.97,120.66h-33.07c28.15,0,50.97-54.02,50.97-120.66s-22.82-120.67-50.97-120.67h33.07Z"
           />
           <Path
-            fill="#fff"
+            fill={isMono ? tintColor : '#fff'}
             fillRule="evenodd"
             d="M684,470.36c9.71,0,17.59,18.64,17.59,41.64s-7.87,41.64-17.59,41.64h-11.41c9.71,0,17.59-18.64,17.59-41.64s-7.87-41.64-17.59-41.64h11.41Z"
           />
-          <Path fill="#fff" fillRule="evenodd" d="M579.7,497.63h88.06c10.74,0,10.74,35.13,0,35.13h-88.06v-35.13Z" />
+          <Path
+            fill={isMono ? tintColor : '#fff'}
+            fillRule="evenodd"
+            d="M579.7,497.63h88.06c10.74,0,10.74,35.13,0,35.13h-88.06v-35.13Z"
+          />
         </G>
       </G>
     </Svg>

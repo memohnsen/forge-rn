@@ -1,6 +1,6 @@
 import { colors } from '@/constants/colors';
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { LogoSvg } from './LogoSvg';
 
 export const SplashScreen: React.FC = () => {
@@ -32,7 +32,14 @@ export const SplashScreen: React.FC = () => {
           ...styles.logoShadow,
         }}
       >
-        <LogoSvg size={140} />
+        <View style={styles.logoWrapper}>
+          {Platform.OS === 'android' && (
+            <View style={styles.logoHalo}>
+              <LogoSvg size={140} tone="mono" tintColor="#FFFFFF" blurRadius={6} />
+            </View>
+          )}
+          <LogoSvg size={140} />
+        </View>
       </Animated.View>
     </View>
   );
@@ -51,5 +58,16 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 0 },
     elevation: 10,
+  },
+  logoWrapper: {
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoHalo: {
+    position: 'absolute',
+    opacity: 0.22,
+    transform: [{ scale: 1.10 }],
   },
 });

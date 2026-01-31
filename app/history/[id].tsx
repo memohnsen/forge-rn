@@ -9,13 +9,12 @@ import { formatDate } from '@/utils/dateFormatter';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -23,8 +22,10 @@ import {
   Text,
   useColorScheme,
   View,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { captureRef } from 'react-native-view-shot';
 import {
   trackCheckInDeleted,
   trackCheckInViewed,
@@ -470,6 +471,9 @@ export default function HistoryDetailsScreen() {
   const { checkIn, session, comp, isLoading, deleteItem } = useHistoryDetails(type, numId);
   const { user } = useHome();
   const hasTrackedView = useRef(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [isSharingImage, setIsSharingImage] = useState(false);
+  const shareCardRef = useRef<View>(null);
 
   const userSport = user?.sport || 'Powerlifting';
 
@@ -549,6 +553,80 @@ Powered By Forge - Performance Journal`;
     }
   };
 
+  const shareCardData = useMemo(() => {
+    if (type === 'Check-Ins' && checkIn) {
+      return {
+        title: 'Check-In Results',
+        subtitle: formatDate(checkIn.check_in_date) || '',
+        stats: [
+          { label: 'Overall', value: `${checkIn.overall_score}%` },
+          { label: 'Physical', value: `${checkIn.physical_score}%` },
+          { label: 'Mental', value: `${checkIn.mental_score}%` },
+        ],
+      };
+    }
+
+    if (type === 'Workouts' && session) {
+      return {
+        title: 'Session Results',
+        subtitle: formatDate(session.session_date) || '',
+        stats: [
+          { label: 'RPE', value: `${session.session_rpe}/5` },
+          { label: 'Quality', value: `${session.movement_quality}/5` },
+          { label: 'Focus', value: `${session.focus}/5` },
+        ],
+      };
+    }
+
+    if (type === 'Meets' && comp) {
+      const total = (comp.squat_best || 0) + (comp.bench_best || 0) + (comp.deadlift_best || 0);
+      return {
+        title: comp.meet,
+        subtitle: formatDate(comp.meet_date) || '',
+        stats: [
+          { label: 'Total', value: `${total}kg` },
+          { label: 'Squat', value: `${comp.squat_best || 0}kg` },
+          { label: 'Bench', value: `${comp.bench_best || 0}kg` },
+        ],
+      };
+    }
+
+    return null;
+  }, [checkIn, comp, session, type]);
+
+  const handleShareImage = async () => {
+    if (!shareCardRef.current || !shareCardData || isSharingImage) return;
+    setIsSharingImage(true);
+
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const uri = await captureRef(shareCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+        backgroundColor: 'transparent',
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share Results',
+        UTI: 'public.png',
+      });
+
+      trackContentShared(type, 'share_image');
+    } catch (error) {
+      console.error('Error sharing image:', error);
+    } finally {
+      setIsSharingImage(false);
+    }
+  };
+
   const handleDelete = () => {
     const confirmDelete = async () => {
       const success = await deleteItem();
@@ -565,52 +643,14 @@ Powered By Forge - Performance Journal`;
       }
     };
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Delete'],
-          destructiveButtonIndex: 1,
-          cancelButtonIndex: 0,
-          title: 'Delete this entry?',
-          message: 'This action cannot be undone.',
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            confirmDelete();
-          }
-        }
-      );
-    } else {
-      Alert.alert('Delete this entry?', 'This action cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: confirmDelete },
-      ]);
-    }
+    Alert.alert('Delete this entry?', 'This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: confirmDelete },
+    ]);
   };
 
   const handleMenu = () => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Share Results', 'Delete'],
-          destructiveButtonIndex: 2,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            handleShare();
-          } else if (buttonIndex === 2) {
-            handleDelete();
-          }
-        }
-      );
-    } else {
-      Alert.alert('Options', undefined, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Share Results', onPress: handleShare },
-        { text: 'Delete', style: 'destructive', onPress: handleDelete },
-      ]);
-    }
+    setMenuVisible(true);
   };
 
   const renderCheckInContent = (checkIn: CheckIn) => (
@@ -930,6 +970,80 @@ Powered By Forge - Performance Journal`;
         {type === 'Workouts' && session && renderSessionContent(session)}
         {type === 'Meets' && comp && renderCompContent(comp)}
       </ScrollView>
+
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
+          <Pressable
+            style={[
+              styles.menuCard,
+              { backgroundColor: isDark ? 'rgba(30,30,30,0.94)' : 'rgba(255,255,255,0.96)' },
+            ]}
+            onPress={() => {}}
+          >
+            <Pressable
+              style={[styles.menuAction, { backgroundColor: isDark ? '#2F2F2F' : '#F1F1F1' }]}
+              onPress={async () => {
+                setMenuVisible(false);
+                await handleShare();
+              }}
+            >
+              <Text style={[styles.menuActionText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+                Share Results as Text
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.menuAction, { backgroundColor: isDark ? '#2F2F2F' : '#F1F1F1' }]}
+              onPress={async () => {
+                setMenuVisible(false);
+                await handleShareImage();
+              }}
+            >
+              <Text style={[styles.menuActionText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+                Share Results as Image
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.menuAction, { backgroundColor: isDark ? '#2F2F2F' : '#F1F1F1' }]}
+              onPress={() => {
+                setMenuVisible(false);
+                handleDelete();
+              }}
+            >
+              <Text style={[styles.menuDeleteText, { color: colors.scoreRed }]}>Delete Entry</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {shareCardData && (
+        <View style={styles.shareCardCanvas} pointerEvents="none">
+          <View collapsable={false} ref={shareCardRef} style={styles.shareCardWrapper}>
+            <LinearGradient
+              colors={['rgba(20,20,20,0.92)', 'rgba(38,38,38,0.92)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.shareCard}
+            >
+              <Text style={styles.shareCardTitle}>{shareCardData.title}</Text>
+              <Text style={styles.shareCardSubtitle}>{shareCardData.subtitle}</Text>
+              <View style={styles.shareCardStats}>
+                {shareCardData.stats.map((stat) => (
+                  <View key={stat.label} style={styles.shareCardStat}>
+                    <Text style={styles.shareCardStatValue}>{stat.value}</Text>
+                    <Text style={styles.shareCardStatLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.shareCardFooter}>Forge • Performance Journal</Text>
+            </LinearGradient>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -956,6 +1070,97 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 8,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuCard: {
+    width: 260,
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  menuAction: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  menuActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  menuDeleteText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareCardCanvas: {
+    position: 'absolute',
+    left: -9999,
+    top: 0,
+  },
+  shareCardWrapper: {
+    backgroundColor: 'transparent',
+    padding: 0,
+  },
+  shareCard: {
+    width: 280,
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  shareCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareCardSubtitle: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  shareCardStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 6,
+  },
+  shareCardStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  shareCardStatValue: {
+    color: colors.gold,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareCardStatLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  shareCardFooter: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   scrollView: {
     flex: 1,
