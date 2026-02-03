@@ -38,6 +38,12 @@ export default {
     },
     plugins: [
       "expo-router",
+      [
+        "expo-av",
+        {
+          microphonePermission: false
+        }
+      ],
       "@bacons/apple-targets",
       [
         "expo-splash-screen",
@@ -49,7 +55,7 @@ export default {
           dark: {
             backgroundColor: "#000000"
           }
-        }
+        },
       ]
     ],
     experiments: {
