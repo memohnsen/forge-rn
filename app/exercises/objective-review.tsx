@@ -4,6 +4,7 @@ import { createClerkSupabaseClient } from '@/services/supabase';
 import { useAuth } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +20,12 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import ReAnimated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   trackMentalExerciseCompleted,
@@ -29,6 +36,7 @@ import {
 type ReviewState = 'vent' | 'processing' | 'reframed';
 
 const BLUE_ENERGY = '#5386E4';
+const AnimatedPressable = ReAnimated.createAnimatedComponent(Pressable);
 
 export default function ObjectiveReviewScreen() {
   const colorScheme = useColorScheme();
@@ -217,12 +225,12 @@ Response Format:
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
+      style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={BLUE_ENERGY} />
+          <MaterialCommunityIcons name="chevron-left" size={22} color={isDark ? '#FFF' : '#000'} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: isDark ? '#FFF' : '#000' }]}>
           Objective Review
@@ -265,7 +273,7 @@ Response Format:
         presentationStyle="pageSheet"
         onRequestClose={() => setShowHistory(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+        <View style={[styles.modalContainer, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
           <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <Text style={[styles.modalTitle, { color: isDark ? '#FFF' : '#000' }]}>
               Training Cues History
@@ -366,8 +374,26 @@ function VentModeView({
   onChangeText: (text: string) => void;
   onReframe: () => void;
 }) {
+  const reframeScale = useSharedValue(1);
+  const reframeAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: reframeScale.value }],
+  }));
+
   return (
-    <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+    <ReAnimated.View
+      entering={FadeInDown.duration(500).springify().damping(16)}
+      style={[
+        styles.card,
+        {
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          borderWidth: 1,
+          borderColor: isDark ? `${BLUE_ENERGY}40` : `${BLUE_ENERGY}20`,
+          boxShadow: isDark
+            ? `0 8px 24px ${BLUE_ENERGY}25`
+            : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${BLUE_ENERGY}30`,
+        },
+      ]}
+    >
       <View style={styles.cardHeader}>
         <View style={[styles.iconCircle, { backgroundColor: `${colors.orange}40` }]}>
           <MaterialCommunityIcons name="fire" size={20} color={colors.orange} />
@@ -400,18 +426,28 @@ function VentModeView({
         textAlignVertical="top"
       />
 
-      <Pressable
-        onPress={onReframe}
+      <AnimatedPressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onReframe();
+        }}
+        onPressIn={() => {
+          reframeScale.value = withSpring(0.95);
+        }}
+        onPressOut={() => {
+          reframeScale.value = withSpring(1);
+        }}
         style={[
           styles.reframeButton,
+          reframeAnimStyle,
           !ventText.trim() && styles.buttonDisabled,
         ]}
         disabled={!ventText.trim()}
       >
         <MaterialCommunityIcons name="refresh" size={18} color="#FFF" />
         <Text style={styles.buttonText}>Convert to Coach Perspective</Text>
-      </Pressable>
-    </View>
+      </AnimatedPressable>
+    </ReAnimated.View>
   );
 }
 
@@ -440,6 +476,15 @@ function ReframedView({
   onSave: () => void;
   onReset: () => void;
 }) {
+  const saveScale = useSharedValue(1);
+  const resetScale = useSharedValue(1);
+  const saveAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: saveScale.value }],
+  }));
+  const resetAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: resetScale.value }],
+  }));
+
   return (
     <>
       <View style={[styles.reframedHeader, { marginBottom: 16 }]}>
@@ -456,48 +501,74 @@ function ReframedView({
         </View>
       </View>
 
-      <View style={[styles.ventCard, { backgroundColor: isDark ? '#FFFFFF08' : '#00000008' }]}>
-        <View style={styles.ventCardHeader}>
-          <MaterialCommunityIcons name="account" size={16} color="#999" />
-          <Text style={styles.ventCardTitle}>The Athlete&apos;s Voice</Text>
-        </View>
-        <Text style={[styles.ventTextDisplay, { color: '#999' }]}>{ventText}</Text>
-      </View>
-
-      <View
-        style={[
-          styles.coachCard,
-          {
-            backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            borderColor: BLUE_ENERGY,
-            shadowColor: BLUE_ENERGY,
-          },
-        ]}
+      <ReAnimated.View
+        entering={FadeInDown.duration(400).springify().damping(16)}
       >
-        <View style={styles.coachCardHeader}>
-          <MaterialCommunityIcons name="shield-check" size={16} color={BLUE_ENERGY} />
-          <Text style={[styles.coachCardTitle, { color: BLUE_ENERGY }]}>The Coach&apos;s Voice</Text>
+        <View style={[styles.ventCard, { backgroundColor: isDark ? '#FFFFFF08' : '#00000008' }]}>
+          <View style={styles.ventCardHeader}>
+            <MaterialCommunityIcons name="account" size={16} color="#999" />
+            <Text style={styles.ventCardTitle}>The Athlete&apos;s Voice</Text>
+          </View>
+          <Text style={[styles.ventTextDisplay, { color: '#999' }]}>{ventText}</Text>
         </View>
-        <Text style={[styles.reframedText, { color: isDark ? '#FFF' : '#000' }]}>
-          {reframedText}
-        </Text>
-      </View>
+      </ReAnimated.View>
 
-      <Pressable
-        onPress={onSave}
-        style={[styles.button, { backgroundColor: BLUE_ENERGY, marginTop: 20 }]}
+      <ReAnimated.View
+        entering={FadeInDown.delay(100).duration(400).springify().damping(16)}
+      >
+        <View
+          style={[
+            styles.coachCard,
+            {
+              backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+              borderColor: BLUE_ENERGY,
+              shadowColor: BLUE_ENERGY,
+            },
+          ]}
+        >
+          <View style={styles.coachCardHeader}>
+            <MaterialCommunityIcons name="shield-check" size={16} color={BLUE_ENERGY} />
+            <Text style={[styles.coachCardTitle, { color: BLUE_ENERGY }]}>The Coach&apos;s Voice</Text>
+          </View>
+          <Text style={[styles.reframedText, { color: isDark ? '#FFF' : '#000' }]}>
+            {reframedText}
+          </Text>
+        </View>
+      </ReAnimated.View>
+
+      <AnimatedPressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onSave();
+        }}
+        onPressIn={() => {
+          saveScale.value = withSpring(0.95);
+        }}
+        onPressOut={() => {
+          saveScale.value = withSpring(1);
+        }}
+        style={[styles.button, saveAnimStyle, { backgroundColor: BLUE_ENERGY, marginTop: 20 }]}
       >
         <MaterialCommunityIcons name="plus-circle" size={18} color="#FFF" />
         <Text style={styles.buttonText}>Add to Training Cues</Text>
-      </Pressable>
+      </AnimatedPressable>
 
-      <Pressable
-        onPress={onReset}
-        style={[styles.button, styles.buttonSecondary, { marginTop: 12 }]}
+      <AnimatedPressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onReset();
+        }}
+        onPressIn={() => {
+          resetScale.value = withSpring(0.95);
+        }}
+        onPressOut={() => {
+          resetScale.value = withSpring(1);
+        }}
+        style={[styles.button, styles.buttonSecondary, resetAnimStyle, { marginTop: 12 }]}
       >
         <MaterialCommunityIcons name="restart" size={18} color={BLUE_ENERGY} />
         <Text style={[styles.buttonText, { color: BLUE_ENERGY }]}>Start Over</Text>
-      </Pressable>
+      </AnimatedPressable>
     </>
   );
 }
@@ -543,6 +614,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     padding: 18,
     gap: 16,
   },
@@ -593,6 +665,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.orange,
     borderRadius: 14,
+    borderCurve: 'continuous',
     paddingVertical: 16,
     gap: 10,
     shadowColor: colors.orange,
@@ -621,6 +694,7 @@ const styles = StyleSheet.create({
   processingCard: {
     backgroundColor: '#1A1A1A',
     borderRadius: 20,
+    borderCurve: 'continuous',
     padding: 40,
     alignItems: 'center',
     gap: 16,

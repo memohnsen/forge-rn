@@ -101,8 +101,10 @@ const RatingDisplaySection: React.FC<RatingDisplaySectionProps> = ({
         styles.ratingCard,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          shadowColor: ratingColor,
-          borderColor: `${ratingColor}33`,
+          borderColor: isDark ? `${ratingColor}33` : `${ratingColor}20`,
+          boxShadow: isDark
+            ? `0 4px 12px ${ratingColor}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${ratingColor}30`,
         },
       ]}
     >
@@ -140,7 +142,10 @@ const TextDisplaySection: React.FC<TextDisplaySectionProps> = ({ title, value, i
         styles.textCard,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          borderColor: isDark ? '#333' : '#E5E5E5',
+          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+          boxShadow: isDark
+            ? '0 4px 12px rgba(0,0,0,0.2)'
+            : '0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
         },
       ]}
     >
@@ -224,8 +229,10 @@ const ResultsDisplaySection: React.FC<ResultsDisplaySectionProps> = ({
         styles.resultsCard,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          shadowColor: colors.gold,
-          borderColor: `${colors.gold}40`,
+          borderColor: isDark ? `${colors.gold}40` : `${colors.gold}20`,
+          boxShadow: isDark
+            ? `0 4px 12px ${colors.gold}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.gold}30`,
         },
       ]}
     >
@@ -301,7 +308,13 @@ const WearableDataSection: React.FC<WearableDataSectionProps> = ({ dateString, i
 
   if (isLoading) {
     return (
-      <View style={[styles.wearableCard, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: isDark ? '#333' : '#E5E5E5' }]}>
+      <View style={[styles.wearableCard, {
+        backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+        boxShadow: isDark
+          ? '0 4px 12px rgba(0,0,0,0.2)'
+          : '0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+      }]}>
         <ActivityIndicator size="small" color={colors.blueEnergy} />
       </View>
     );
@@ -323,8 +336,10 @@ const WearableDataSection: React.FC<WearableDataSectionProps> = ({ dateString, i
       styles.wearableCard,
       {
         backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-        borderColor: `${colors.blueEnergy}33`,
-        shadowColor: colors.blueEnergy,
+        borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+        boxShadow: isDark
+          ? `0 4px 12px ${colors.blueEnergy}20`
+          : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
       }
     ]}>
       <View style={styles.wearableHeader}>
@@ -902,7 +917,7 @@ Powered By Forge - Performance Journal`;
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
@@ -924,7 +939,7 @@ Powered By Forge - Performance Journal`;
 
   if (!item) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
@@ -949,7 +964,7 @@ Powered By Forge - Performance Journal`;
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
@@ -1080,13 +1095,10 @@ const styles = StyleSheet.create({
   menuCard: {
     width: 260,
     borderRadius: 20,
+    borderCurve: 'continuous',
     padding: 16,
     gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.1)',
   },
   menuAction: {
     paddingVertical: 12,
@@ -1198,13 +1210,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 20,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
     alignItems: 'center',
     gap: 12,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
   },
   ratingTitle: {
     fontSize: 15,
@@ -1233,13 +1242,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 16,
     borderRadius: 16,
+    borderCurve: 'continuous',
     borderWidth: 1,
     gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   textTitle: {
     fontSize: 15,
@@ -1254,12 +1259,9 @@ const styles = StyleSheet.create({
   resultsCard: {
     marginHorizontal: 16,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
     overflow: 'hidden',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
   },
   liftRow: {
     flexDirection: 'row',
@@ -1296,11 +1298,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 16,
     borderRadius: 16,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
     gap: 14,
   },
   wearableHeader: {

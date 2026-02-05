@@ -38,7 +38,12 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.gradient, isEnabled && { shadowColor: accentColor }]}
+          style={[
+            styles.gradient,
+            isEnabled && {
+              boxShadow: `0 4px 12px ${accentColor}50`,
+            },
+          ]}
         >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -74,10 +79,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 16,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
   text: {
     fontSize: 17,

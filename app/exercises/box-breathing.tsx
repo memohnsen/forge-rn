@@ -1,5 +1,6 @@
 import { colors } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -11,6 +12,14 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import ReAnimated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
@@ -19,6 +28,8 @@ import {
   trackMentalExerciseStarted,
   trackScreenView,
 } from '@/utils/analytics';
+
+const AnimatedPressable = ReAnimated.createAnimatedComponent(Pressable);
 
 const PHASES = ['Inhale', 'Hold', 'Exhale', 'Hold'];
 
@@ -32,6 +43,11 @@ export default function BoxBreathingScreen() {
   const [isExerciseActive, setIsExerciseActive] = useState(false);
   const exerciseStartRef = useRef<number | null>(null);
 
+  const buttonScale = useSharedValue(1);
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+
   useEffect(() => {
     trackScreenView('box_breathing');
   }, []);
@@ -43,7 +59,7 @@ export default function BoxBreathingScreen() {
     totalMinutes > 0 ? `${totalMinutes} min ${totalSeconds} sec` : `${totalSeconds} sec`;
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       {isExerciseActive ? (
         <BreathingExercise
           holdDuration={holdDuration}
@@ -62,8 +78,8 @@ export default function BoxBreathingScreen() {
           <View style={[styles.header, { paddingTop: insets.top }]}>
             <Pressable onPress={() => router.back()} style={styles.backButton}>
               <MaterialCommunityIcons
-                name="arrow-left"
-                size={24}
+                name="chevron-left"
+                size={22}
                 color={isDark ? '#FFF' : '#000'}
               />
             </Pressable>
@@ -78,134 +94,182 @@ export default function BoxBreathingScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: '#64B4DC33' },
-              ]}
-            >
-              <View style={styles.cardHeader}>
-                <LinearGradient
-                  colors={['#64B4DC40', '#64B4DC1A']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.iconCircle}
-                >
-                  <MaterialCommunityIcons name="weather-windy" size={20} color="#64B4DC" />
-                </LinearGradient>
-
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                    Box Breathing
-                  </Text>
-                  <Text style={styles.cardSubtitle}>
-                    {holdDuration}-{holdDuration}-{holdDuration}-{holdDuration} pattern
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.cardDescription}>
-                Inhale, hold, exhale, hold. Each phase lasts the same duration to calm your mind
-                and body.
-              </Text>
-            </View>
-
-            <View
-              style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}
-            >
-              <View style={styles.sliderHeader}>
-                <LinearGradient
-                  colors={['#64B4DC40', '#64B4DC1A']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.sliderIcon}
-                >
-                  <MaterialCommunityIcons name="timer" size={16} color="#64B4DC" />
-                </LinearGradient>
-                <View style={styles.sliderText}>
-                  <Text style={[styles.sliderTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                    Breath Duration
-                  </Text>
-                  <Text style={styles.sliderSubtitle}>seconds per phase</Text>
-                </View>
-                <Text style={[styles.sliderValue, { color: '#64B4DC' }]}>{holdDuration}</Text>
-              </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={2}
-                maximumValue={8}
-                step={1}
-                value={holdDuration}
-                onValueChange={setHoldDuration}
-                minimumTrackTintColor="#64B4DC"
-                maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
-                thumbTintColor="#64B4DC"
-              />
-            </View>
-
-            <View
-              style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}
-            >
-              <View style={styles.sliderHeader}>
-                <LinearGradient
-                  colors={['#64B4DC40', '#64B4DC1A']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.sliderIcon}
-                >
-                  <MaterialCommunityIcons name="refresh" size={16} color="#64B4DC" />
-                </LinearGradient>
-                <View style={styles.sliderText}>
-                  <Text style={[styles.sliderTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                    Number of Rounds
-                  </Text>
-                  <Text style={styles.sliderSubtitle}>complete cycles</Text>
-                </View>
-                <Text style={[styles.sliderValue, { color: '#64B4DC' }]}>{numberOfRounds}</Text>
-              </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={20}
-                step={1}
-                value={numberOfRounds}
-                onValueChange={setNumberOfRounds}
-                minimumTrackTintColor="#64B4DC"
-                maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
-                thumbTintColor="#64B4DC"
-              />
-            </View>
-
-            <View
-              style={[
-                styles.totalTimeCard,
-                { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' },
-              ]}
-            >
-              <Text style={styles.totalTimeLabel}>Total Time</Text>
-              <Text style={[styles.totalTimeValue, { color: '#64B4DC' }]}>
-                {totalTimeFormatted}
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={() => {
-                exerciseStartRef.current = Date.now();
-                trackMentalExerciseStarted('box_breathing');
-                setIsExerciseActive(true);
-              }}
-              style={styles.startButton}
-            >
-              <LinearGradient
-                colors={['#64B4DC', '#64B4DCD9']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.startButtonGradient}
+            <ReAnimated.View entering={FadeInDown.delay(0).duration(500).springify().damping(16)}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    borderColor: '#64B4DC33',
+                    boxShadow: isDark
+                      ? '0 8px 24px #64B4DC25'
+                      : '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px #64B4DC30',
+                  },
+                ]}
               >
-                <MaterialCommunityIcons name="play" size={20} color="#FFF" />
-                <Text style={styles.startButtonText}>Start Breathing</Text>
-              </LinearGradient>
-            </Pressable>
+                <View style={styles.cardHeader}>
+                  <LinearGradient
+                    colors={['#64B4DC40', '#64B4DC1A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.iconCircle}
+                  >
+                    <MaterialCommunityIcons name="weather-windy" size={20} color="#64B4DC" />
+                  </LinearGradient>
+
+                  <View style={styles.cardText}>
+                    <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                      Box Breathing
+                    </Text>
+                    <Text style={styles.cardSubtitle}>
+                      {holdDuration}-{holdDuration}-{holdDuration}-{holdDuration} pattern
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.cardDescription}>
+                  Inhale, hold, exhale, hold. Each phase lasts the same duration to calm your mind
+                  and body.
+                </Text>
+              </View>
+            </ReAnimated.View>
+
+            <ReAnimated.View entering={FadeInDown.delay(50).duration(500).springify().damping(16)}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    borderColor: isDark ? '#64B4DC40' : '#64B4DC20',
+                    boxShadow: isDark
+                      ? '0 8px 24px #64B4DC20'
+                      : '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px #64B4DC25',
+                  },
+                ]}
+              >
+                <View style={styles.sliderHeader}>
+                  <LinearGradient
+                    colors={['#64B4DC40', '#64B4DC1A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sliderIcon}
+                  >
+                    <MaterialCommunityIcons name="timer" size={16} color="#64B4DC" />
+                  </LinearGradient>
+                  <View style={styles.sliderText}>
+                    <Text style={[styles.sliderTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                      Breath Duration
+                    </Text>
+                    <Text style={styles.sliderSubtitle}>seconds per phase</Text>
+                  </View>
+                  <Text style={[styles.sliderValue, { color: '#64B4DC' }]}>{holdDuration}</Text>
+                </View>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={2}
+                  maximumValue={8}
+                  step={1}
+                  value={holdDuration}
+                  onValueChange={setHoldDuration}
+                  minimumTrackTintColor="#64B4DC"
+                  maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
+                  thumbTintColor="#64B4DC"
+                />
+              </View>
+            </ReAnimated.View>
+
+            <ReAnimated.View entering={FadeInDown.delay(100).duration(500).springify().damping(16)}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    borderColor: isDark ? '#64B4DC40' : '#64B4DC20',
+                    boxShadow: isDark
+                      ? '0 8px 24px #64B4DC20'
+                      : '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px #64B4DC25',
+                  },
+                ]}
+              >
+                <View style={styles.sliderHeader}>
+                  <LinearGradient
+                    colors={['#64B4DC40', '#64B4DC1A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sliderIcon}
+                  >
+                    <MaterialCommunityIcons name="refresh" size={16} color="#64B4DC" />
+                  </LinearGradient>
+                  <View style={styles.sliderText}>
+                    <Text style={[styles.sliderTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                      Number of Rounds
+                    </Text>
+                    <Text style={styles.sliderSubtitle}>complete cycles</Text>
+                  </View>
+                  <Text style={[styles.sliderValue, { color: '#64B4DC' }]}>{numberOfRounds}</Text>
+                </View>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={1}
+                  maximumValue={20}
+                  step={1}
+                  value={numberOfRounds}
+                  onValueChange={setNumberOfRounds}
+                  minimumTrackTintColor="#64B4DC"
+                  maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
+                  thumbTintColor="#64B4DC"
+                />
+              </View>
+            </ReAnimated.View>
+
+            <ReAnimated.View entering={FadeInDown.delay(150).duration(500).springify().damping(16)}>
+              <View
+                style={[
+                  styles.totalTimeCard,
+                  {
+                    backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: isDark ? '#64B4DC40' : '#64B4DC20',
+                    boxShadow: isDark
+                      ? '0 8px 24px #64B4DC20'
+                      : '0 1px 3px rgba(0,0,0,0.08), 0 8px 24px #64B4DC25',
+                  },
+                ]}
+              >
+                <Text style={styles.totalTimeLabel}>Total Time</Text>
+                <Text style={[styles.totalTimeValue, { color: '#64B4DC' }]}>
+                  {totalTimeFormatted}
+                </Text>
+              </View>
+            </ReAnimated.View>
+
+            <ReAnimated.View entering={FadeInDown.delay(200).duration(500).springify().damping(16)}>
+              <AnimatedPressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  exerciseStartRef.current = Date.now();
+                  trackMentalExerciseStarted('box_breathing');
+                  setIsExerciseActive(true);
+                }}
+                onPressIn={() => {
+                  buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+                }}
+                onPressOut={() => {
+                  buttonScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+                }}
+                style={[styles.startButton, buttonAnimatedStyle]}
+              >
+                <LinearGradient
+                  colors={['#64B4DC', '#64B4DCD9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.startButtonGradient}
+                >
+                  <MaterialCommunityIcons name="play" size={20} color="#FFF" />
+                  <Text style={styles.startButtonText}>Start Breathing</Text>
+                </LinearGradient>
+              </AnimatedPressable>
+            </ReAnimated.View>
           </ScrollView>
         </>
       )}
@@ -437,7 +501,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#64B4DC22',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 17,
@@ -454,6 +523,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 18,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
     gap: 12,
   },
@@ -524,6 +594,7 @@ const styles = StyleSheet.create({
   totalTimeCard: {
     padding: 24,
     borderRadius: 20,
+    borderCurve: 'continuous',
     alignItems: 'center',
     gap: 8,
   },
@@ -538,6 +609,7 @@ const styles = StyleSheet.create({
   },
   startButton: {
     borderRadius: 14,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     marginTop: 8,
   },

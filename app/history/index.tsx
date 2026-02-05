@@ -112,8 +112,10 @@ export default function HistoryScreen() {
           styles.historyCard,
           {
             backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            shadowColor: scoreColor,
-            borderColor: `${scoreColor}26`,
+            borderColor: isDark ? `${scoreColor}33` : `${scoreColor}20`,
+            boxShadow: isDark
+              ? `0 4px 12px ${scoreColor}20`
+              : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${scoreColor}30`,
           },
         ]}
         onPress={() => handleItemPress('Check-Ins', item.id!)}
@@ -155,8 +157,10 @@ export default function HistoryScreen() {
           styles.historyCard,
           {
             backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            shadowColor: accentColor,
-            borderColor: `${accentColor}26`,
+            borderColor: isDark ? `${accentColor}33` : `${accentColor}20`,
+            boxShadow: isDark
+              ? `0 4px 12px ${accentColor}20`
+              : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accentColor}30`,
           },
         ]}
         onPress={() => handleItemPress('Workouts', item.id!)}
@@ -206,8 +210,10 @@ export default function HistoryScreen() {
           styles.historyCard,
           {
             backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            shadowColor: accentColor,
-            borderColor: `${accentColor}26`,
+            borderColor: isDark ? `${accentColor}33` : `${accentColor}20`,
+            boxShadow: isDark
+              ? `0 4px 12px ${accentColor}20`
+              : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accentColor}30`,
           },
         ]}
         onPress={() => handleItemPress('Meets', item.id!)}
@@ -274,7 +280,7 @@ export default function HistoryScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
@@ -372,6 +378,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 12,
+    borderCurve: 'continuous',
     borderWidth: 1,
     alignItems: 'center',
   },
@@ -399,11 +406,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     borderRadius: 16,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
     gap: 14,
   },
   scoreCircle: {

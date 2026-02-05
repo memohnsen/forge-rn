@@ -138,7 +138,7 @@ export default function CheckInScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />

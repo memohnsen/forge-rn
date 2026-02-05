@@ -1,11 +1,16 @@
 import { colors } from '@/constants/colors';
 import { useTrends } from '@/hooks/use-trends';
+import {
+  trackScreenView,
+  trackTrendsFilterChanged,
+  trackTrendsTimeFrameChanged,
+} from '@/utils/analytics';
+import { DEFAULT_SELECTED, TIME_FRAMES, type ChartCategory, type ChartConfig, type TrendPoint } from '@/utils/trends-data';
 import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
-import { DEFAULT_SELECTED, TIME_FRAMES, type ChartConfig, type ChartCategory, type TrendPoint } from '@/utils/trends-data';
-import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -16,12 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
-import {
-  trackScreenView,
-  trackTrendsFilterChanged,
-  trackTrendsTimeFrameChanged,
-} from '@/utils/analytics';
+import Svg, { Circle, Defs, Path, Stop, LinearGradient as SvgLinearGradient, Text as SvgText } from 'react-native-svg';
 
 
 export default function TrendsScreen() {
@@ -146,7 +146,7 @@ export default function TrendsScreen() {
 
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -187,7 +187,12 @@ export default function TrendsScreen() {
                   styles.filterChip,
                   {
                     backgroundColor: isSelected ? option.accentColor : isDark ? '#1A1A1A' : '#FFFFFF',
-                    borderColor: `${option.accentColor}33`,
+                    borderColor: isDark ? `${option.accentColor}33` : `${option.accentColor}20`,
+                    boxShadow: isSelected
+                      ? 'none'
+                      : isDark
+                        ? `0 4px 12px ${option.accentColor}20`
+                        : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${option.accentColor}30`,
                   },
                 ]}
               >
@@ -215,8 +220,10 @@ export default function TrendsScreen() {
               styles.aiCard,
               {
                 backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                borderColor: `${colors.blueEnergy}33`,
-                shadowColor: colors.blueEnergy,
+                borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+                boxShadow: isDark
+                  ? `0 8px 24px ${colors.blueEnergy}25`
+                  : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${colors.blueEnergy}35`,
               },
             ]}
           >
@@ -308,16 +315,19 @@ function TrendCard({
         styles.chartCard,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          borderColor: `${colors.blueEnergy}33`,
-          shadowColor: colors.blueEnergy,
+          borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+          boxShadow: isDark
+            ? `0 8px 24px ${colors.blueEnergy}25`
+            : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${colors.blueEnergy}35`,
         },
       ]}
     >
       <View style={styles.chartHeader}>
-        <View>
+        <View style={styles.chartTitleRow}>
           <Text style={[styles.chartTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
             {chart.title}
           </Text>
+          <MaterialCommunityIcons name="information-outline" size={18} color={isDark ? '#555' : '#BBB'} />
         </View>
         <View
           style={[
@@ -341,6 +351,7 @@ function TrendCard({
         <Sparkline
           data={chart.data}
           color={colors.blueEnergy}
+          isDark={isDark}
           yMin={chart.yMin}
           yMax={chart.yMax}
           yStep={chart.yStep}
@@ -476,32 +487,45 @@ function ChartSelectionSheet({
 function Sparkline({
   data,
   color,
+  isDark,
   yMin,
   yMax,
   yStep,
 }: {
   data: TrendPoint[];
   color: string;
+  isDark: boolean;
   yMin: number;
   yMax: number;
   yStep: number;
 }) {
-  const viewWidth = 140;
-  const viewHeight = 48;
-  const padding = 2;
+  const viewWidth = 200;
+  const viewHeight = 80;
+  const paddingLeft = 4;
+  const paddingTop = 0;
+  const paddingBottom = 0;
   const rightLabelWidth = 18;
   const plotWidth = viewWidth - rightLabelWidth;
+  const plotHeight = viewHeight - paddingTop - paddingBottom;
   const minY = yMin;
   const maxY = yMax;
   const span = maxY - minY || 1;
+  const gradientId = `fill-${color.replace('#', '')}`;
 
-  const points = data.map((point, index) => {
+  const coords = data.map((point, index) => {
     const x =
-      padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
+      paddingLeft + (index / Math.max(1, data.length - 1)) * (plotWidth - paddingLeft * 2);
     const normalized = (point.value - minY) / span;
-    const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
+    const y = viewHeight - paddingBottom - normalized * plotHeight;
+    return { x, y };
   });
+
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+
+  const bottomY = viewHeight - paddingBottom;
+  const fillPath = coords.length > 0
+    ? `${linePath} L${coords[coords.length - 1].x.toFixed(2)},${bottomY} L${coords[0].x.toFixed(2)},${bottomY} Z`
+    : '';
 
   const gridValues: number[] = [];
   for (let value = minY; value <= maxY + 0.001; value += yStep) {
@@ -509,45 +533,56 @@ function Sparkline({
   }
 
   return (
-    <Svg width="100%" height={140} viewBox={`0 0 ${viewWidth} ${viewHeight}`}>
+    <Svg width="100%" height={200} viewBox={`0 0 ${viewWidth} ${viewHeight}`}>
+      <Defs>
+        <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={0.35} />
+          <Stop offset="0.6" stopColor={color} stopOpacity={0.1} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </SvgLinearGradient>
+      </Defs>
+
       {gridValues.map((value) => {
         const normalized = (value - minY) / span;
-        const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
+        const y = viewHeight - paddingBottom - normalized * plotHeight;
         return (
           <React.Fragment key={`grid-${value}`}>
             <Path
-              d={`M${padding},${y.toFixed(2)} L${(plotWidth - padding).toFixed(2)},${y.toFixed(2)}`}
-              stroke="#2D3640"
-              strokeWidth={0.8}
-              strokeDasharray="2 4"
+              d={`M${paddingLeft},${y.toFixed(2)} L${(plotWidth - paddingLeft).toFixed(2)},${y.toFixed(2)}`}
+              stroke={isDark ? 'rgba(150,150,150,0.2)' : 'rgba(0,0,0,0.12)'}
+              strokeWidth={0.4}
+              strokeDasharray="3 3"
             />
             <SvgText
               x={viewWidth - 2}
-              y={y + 3}
-              fontSize={5}
+              y={y + 1.8}
+              fontSize={6}
               fill={color}
               textAnchor="end"
+              opacity={0.7}
             >
               {value}
             </SvgText>
           </React.Fragment>
         );
       })}
+
+      {fillPath ? (
+        <Path d={fillPath} fill={`url(#${gradientId})`} />
+      ) : null}
+
       <Path
-        d={points.join(' ')}
+        d={linePath}
         stroke={color}
-        strokeWidth={1.2}
+        strokeWidth={1.4}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      {data.map((point, index) => {
-        const x =
-          padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
-        const normalized = (point.value - minY) / span;
-        const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
-        return <Circle key={`dot-${index}`} cx={x} cy={y} r={2} fill={color} />;
-      })}
+
+      {coords.map((c, index) => (
+        <Circle key={`dot-${index}`} cx={c.x} cy={c.y} r={2.2} fill={color} />
+      ))}
     </Svg>
   );
 }
@@ -647,16 +682,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 18,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
   },
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  chartTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   chartTitle: {
     fontSize: 16,
@@ -681,8 +718,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chartCanvas: {
-    marginTop: 12,
-    marginLeft: -6,
+    marginTop: 2,
+    marginHorizontal: -10,
+    marginBottom: -12,
   },
   chartFooter: {
     flexDirection: 'row',

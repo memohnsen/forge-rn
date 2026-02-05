@@ -1,7 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, useColorScheme } from 'react-native';
+import { Pressable, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface MeetCountdownCardProps {
   meetName: string;
@@ -22,6 +33,7 @@ export const MeetCountdownCard: React.FC<MeetCountdownCardProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const pressed = useSharedValue(0);
 
   const countdownColor = (() => {
     if (daysUntilMeet < 0) {
@@ -35,120 +47,114 @@ export const MeetCountdownCard: React.FC<MeetCountdownCardProps> = ({
     }
   })();
 
+  const progressPercent = Math.max(0, Math.min(1, 1 - daysUntilMeet / 90));
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: withSpring(interpolate(pressed.value, [0, 1], [1, 0.97]), { damping: 15, stiffness: 300 }) },
+    ],
+  }));
+
+  const handlePressIn = () => {
+    pressed.value = withTiming(1, { duration: 150 });
+  };
+
+  const handlePressOut = () => {
+    pressed.value = withSpring(0, { damping: 15, stiffness: 300 });
+  };
+
+  const handlePress = () => {
+    if (process.env.EXPO_OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onPress?.();
+  };
+
   return (
-    <Pressable onPress={onPress} style={styles.wrapper}>
-      <View
+    <Animated.View
+      entering={FadeInDown.duration(500).springify().damping(16)}
+      style={{ marginHorizontal: 16 }}
+    >
+      <AnimatedPressable
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         style={[
-          styles.container,
+          animatedStyle,
           {
+            borderRadius: 20,
+            borderCurve: 'continuous',
+            borderWidth: 1,
             backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            shadowColor: countdownColor,
-            borderColor: `${countdownColor}40`,
+            borderColor: isDark ? `${countdownColor}40` : `${countdownColor}20`,
+            boxShadow: isDark
+              ? `0 8px 24px ${countdownColor}30`
+              : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${countdownColor}40`,
           },
         ]}
       >
-        <View style={styles.content}>
-          <View style={styles.topRow}>
-            <View style={styles.leftSection}>
-              <View style={styles.meetNameRow}>
+        <Animated.View style={{ padding: 18, gap: 14 }}>
+          <Animated.View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Animated.View style={{ flex: 1, gap: 8 }}>
+              <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="flag" size={14} color={colors.gold} />
-                <Text
-                  style={[styles.meetName, { color: isDark ? '#FFFFFF' : '#000000' }]}
+                <Animated.Text
+                  style={{ fontSize: 14, fontWeight: '600', flex: 1, color: isDark ? '#FFFFFF' : '#000000' }}
                   numberOfLines={1}
                 >
                   {meetName}
-                </Text>
-              </View>
-              <Text style={[styles.sessionsLeft, { color: countdownColor }]}>
+                </Animated.Text>
+              </Animated.View>
+              <Animated.Text style={{ fontSize: 22, fontWeight: '800', color: countdownColor, fontVariant: ['tabular-nums'] }}>
                 {sessionsLeftText}
-              </Text>
-            </View>
+              </Animated.Text>
+            </Animated.View>
 
-            <View style={styles.rightSection}>
-              <Text style={styles.meetDate}>{meetDate}</Text>
-              <Text style={[styles.daysLeft, { color: colors.gold }]}>{daysUntilMeetText}</Text>
-            </View>
-          </View>
+            <Animated.View style={{ alignItems: 'flex-end', gap: 8 }}>
+              <Animated.Text style={{ fontSize: 14, fontWeight: '600', color: '#999' }}>
+                {meetDate}
+              </Animated.Text>
+              <Animated.Text style={{ fontSize: 22, fontWeight: '800', color: colors.gold, fontVariant: ['tabular-nums'] }}>
+                {daysUntilMeetText}
+              </Animated.Text>
+            </Animated.View>
+          </Animated.View>
+
+          {/* Progress bar */}
+          {daysUntilMeet > 0 && (
+            <Animated.View
+              style={{
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                overflow: 'hidden',
+              }}
+            >
+              <Animated.View
+                entering={FadeInDown.delay(300).duration(600)}
+                style={{
+                  height: '100%',
+                  width: `${progressPercent * 100}%`,
+                  borderRadius: 2,
+                  backgroundColor: countdownColor,
+                }}
+              />
+            </Animated.View>
+          )}
 
           {daysUntilMeet <= 0 && (
             <>
-              <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#E5E5E5' }]} />
-              <View style={styles.editRow}>
+              <Animated.View style={{ height: 1, backgroundColor: isDark ? '#333' : '#E5E5E5' }} />
+              <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="pencil-outline" size={12} color="#999" />
-                <Text style={styles.editText}>Tap to edit meet details</Text>
-                <View style={{ flex: 1 }} />
+                <Animated.Text style={{ fontSize: 12, color: '#999' }}>Tap to edit meet details</Animated.Text>
+                <Animated.View style={{ flex: 1 }} />
                 <Ionicons name="chevron-forward" size={12} color="#666" />
-              </View>
+              </Animated.View>
             </>
           )}
-        </View>
-      </View>
-    </Pressable>
+        </Animated.View>
+      </AnimatedPressable>
+    </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  wrapper: {
-    marginHorizontal: 16,
-  },
-  container: {
-    borderRadius: 20,
-    borderWidth: 1,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  content: {
-    padding: 18,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  leftSection: {
-    flex: 1,
-    gap: 8,
-  },
-  meetNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  meetName: {
-    fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-  },
-  sessionsLeft: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  rightSection: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  meetDate: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#999',
-  },
-  daysLeft: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 14,
-  },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  editText: {
-    fontSize: 12,
-    color: '#999',
-  },
-});

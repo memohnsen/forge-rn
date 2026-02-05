@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 export default function GraphDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -228,8 +228,8 @@ function LargeChart({
 }) {
   const viewWidth = 220;
   const viewHeight = 120;
-  const padding = 8;
-  const rightLabelWidth = 28;
+  const padding = 3;
+  const rightLabelWidth = 20;
   const plotWidth = viewWidth - rightLabelWidth;
   const span = yMax - yMin || 1;
 
@@ -238,16 +238,32 @@ function LargeChart({
     gridValues.push(Number(value.toFixed(2)));
   }
 
-  const points = data.map((point, index) => {
+  const gradientId = `large-fill-${color.replace('#', '')}`;
+  const bottomY = viewHeight - padding;
+
+  const coords = data.map((point, index) => {
     const x =
       padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
     const normalized = (point.value - yMin) / span;
     const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
+    return { x, y };
   });
+
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+  const fillPath = coords.length > 0
+    ? `${linePath} L${coords[coords.length - 1].x.toFixed(2)},${bottomY} L${coords[0].x.toFixed(2)},${bottomY} Z`
+    : '';
 
   return (
     <Svg width="100%" height={240} viewBox={`0 0 ${viewWidth} ${viewHeight}`}>
+      <Defs>
+        <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={0.35} />
+          <Stop offset="0.6" stopColor={color} stopOpacity={0.1} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </SvgLinearGradient>
+      </Defs>
+
       {gridValues.map((value) => {
         const normalized = (value - yMin) / span;
         const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
@@ -255,24 +271,23 @@ function LargeChart({
           <React.Fragment key={`grid-${value}`}>
             <Path
               d={`M${padding},${y.toFixed(2)} L${(plotWidth - padding).toFixed(2)},${y.toFixed(2)}`}
-              stroke="#2D3640"
-              strokeWidth={0.8}
-              strokeDasharray="3 6"
+              stroke="rgba(150,150,150,0.2)"
+              strokeWidth={0.5}
+              strokeDasharray="3 3"
             />
-            <SvgText x={viewWidth - 2} y={y + 4} fontSize={8} fill={color} textAnchor="end">
+            <SvgText x={viewWidth - 2} y={y + 4} fontSize={8} fill={color} textAnchor="end" opacity={0.7}>
               {value}
             </SvgText>
           </React.Fragment>
         );
       })}
-      <Path d={points.join(' ')} stroke={color} strokeWidth={1.6} fill="none" />
-      {data.map((point, index) => {
-        const x =
-          padding + (index / Math.max(1, data.length - 1)) * (plotWidth - padding * 2);
-        const normalized = (point.value - yMin) / span;
-        const y = viewHeight - padding - normalized * (viewHeight - padding * 2);
-        return <Circle key={`dot-${index}`} cx={x} cy={y} r={3} fill={color} />;
-      })}
+
+      {fillPath ? <Path d={fillPath} fill={`url(#${gradientId})`} /> : null}
+
+      <Path d={linePath} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {coords.map((c, index) => (
+        <Circle key={`dot-${index}`} cx={c.x} cy={c.y} r={3} fill={color} />
+      ))}
     </Svg>
   );
 }

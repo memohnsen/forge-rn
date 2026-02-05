@@ -1,9 +1,23 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, useColorScheme } from 'react-native';
+import React, { useEffect } from 'react';
+import { Pressable, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/colors';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  interpolate,
+  Easing,
+} from 'react-native-reanimated';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface DailyCheckInSectionProps {
   streakCount: string;
@@ -24,135 +38,137 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
   const isDark = colorScheme === 'dark';
   const router = useRouter();
 
-  return (
-    <View style={styles.wrapper}>
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            shadowColor: colors.checkInOrange,
-            borderColor: `${colors.checkInOrange}40`,
-          },
-        ]}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <LinearGradient
-              colors={[`${colors.checkInOrange}4D`, `${colors.checkInOrange}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconCircle}
-            >
-              <Ionicons name="sunny" size={24} color={colors.checkInOrange} />
-            </LinearGradient>
+  const buttonPressed = useSharedValue(0);
+  const pulse = useSharedValue(1);
 
-            <View style={styles.headerText}>
-              <View style={[styles.streakBadge, { backgroundColor: `${streakColor}1F` }]}>
+  useEffect(() => {
+    if (parseInt(streakCount) > 0) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    }
+  }, [streakCount]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: withSpring(interpolate(buttonPressed.value, [0, 1], [1, 0.95]), { damping: 15, stiffness: 350 }) },
+    ],
+  }));
+
+  const handleButtonPress = () => {
+    if (process.env.EXPO_OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    router.push('/check-in' as any);
+  };
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(100).duration(500).springify().damping(16)}
+      style={{ marginHorizontal: 16 }}
+    >
+      <Animated.View
+        style={{
+          borderRadius: 20,
+          borderCurve: 'continuous',
+          borderWidth: 1,
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          borderColor: isDark ? `${colors.checkInOrange}40` : `${colors.checkInOrange}20`,
+          boxShadow: isDark
+            ? `0 8px 24px ${colors.checkInOrange}25`
+            : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${colors.checkInOrange}40`,
+        }}
+      >
+        <Animated.View style={{ padding: 18, gap: 14 }}>
+          <Animated.View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+            <Animated.View style={pulseStyle}>
+              <LinearGradient
+                colors={[`${colors.checkInOrange}4D`, `${colors.checkInOrange}1A`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 26,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons name="sunny" size={24} color={colors.checkInOrange} />
+              </LinearGradient>
+            </Animated.View>
+
+            <Animated.View style={{ flex: 1, gap: 6 }}>
+              <Animated.View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  alignSelf: 'flex-start',
+                  backgroundColor: `${streakColor}1F`,
+                }}
+              >
                 <Ionicons
                   name={streakIcon === 'flame.fill' ? 'flame' : 'flame-outline'}
                   size={12}
                   color={streakColor}
                 />
-                <Text style={[styles.streakText, { color: streakColor }]}>
+                <Animated.Text style={{ fontSize: 12, fontWeight: '600', color: streakColor }}>
                   {streakCount} {streakLabel} {streakStatus}
-                </Text>
-              </View>
+                </Animated.Text>
+              </Animated.View>
 
-              <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              <Animated.Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#FFFFFF' : '#000000' }}>
                 Daily Check-In
-              </Text>
-            </View>
-          </View>
+              </Animated.Text>
+            </Animated.View>
+          </Animated.View>
 
-          <Text style={styles.description}>
+          <Animated.Text style={{ fontSize: 14, color: '#999', lineHeight: 20 }}>
             How is your body feeling before today&apos;s session? Track your readiness to optimize your
             training.
-          </Text>
+          </Animated.Text>
 
-          <Pressable onPress={() => router.push('/check-in' as any)}>
+          <AnimatedPressable
+            onPress={handleButtonPress}
+            onPressIn={() => { buttonPressed.value = withTiming(1, { duration: 100 }); }}
+            onPressOut={() => { buttonPressed.value = withSpring(0, { damping: 15, stiffness: 350 }); }}
+            style={buttonAnimatedStyle}
+          >
             <LinearGradient
               colors={[colors.checkInOrange, `${colors.checkInOrange}D9`]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.button}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 14,
+                borderRadius: 12,
+                borderCurve: 'continuous',
+              }}
             >
-              <Text style={styles.buttonText}>Start Check-In</Text>
+              <Animated.Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }}>
+                Start Check-In
+              </Animated.Text>
               <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
             </LinearGradient>
-          </Pressable>
-        </View>
-      </View>
-    </View>
+          </AnimatedPressable>
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  wrapper: {
-    marginHorizontal: 16,
-  },
-  container: {
-    borderRadius: 20,
-    borderWidth: 1,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  content: {
-    padding: 18,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    marginBottom: 14,
-  },
-  iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    flex: 1,
-    gap: 6,
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  streakText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  description: {
-    fontSize: 14,
-    color: '#999',
-    lineHeight: 20,
-    marginBottom: 18,
-  },
-  button: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});

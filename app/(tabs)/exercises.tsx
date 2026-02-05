@@ -107,7 +107,7 @@ export default function ExercisesScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
@@ -124,8 +124,10 @@ export default function ExercisesScreen() {
                   styles.card,
                   {
                     backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                    borderColor: `${exercise.accentColor}33`,
-                    shadowColor: exercise.accentColor,
+                    borderColor: isDark ? `${exercise.accentColor}33` : `${exercise.accentColor}20`,
+                    boxShadow: isDark
+                      ? `0 8px 24px ${exercise.accentColor}30`
+                      : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${exercise.accentColor}40`,
                   },
                 ]}
               >
@@ -195,11 +197,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 18,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
     gap: 18,
   },
   cardHeader: {

@@ -22,6 +22,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ReAnimated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming, interpolate } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 import { textToSpeech, VoiceOption, VOICES } from '@/services/elevenlabs';
 import { queryOpenRouter } from '@/services/openrouter';
@@ -36,6 +38,8 @@ import {
 const ACCENT_COLOR = '#9966CC'; // Purple to match Swift
 const PLAYER_COLOR = '#4A90D9'; // Blue energy for player (matches Swift PlayerView)
 const CACHE_DIR = `${FileSystem.cacheDirectory}visualizations/`;
+
+const AnimatedPressable = ReAnimated.createAnimatedComponent(Pressable);
 
 type ScreenState = 'setup' | 'generating' | 'player';
 
@@ -282,7 +286,7 @@ Generate only the script text, no titles or headers. Start directly with the vis
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       {screenState === 'setup' && (
         <SetupScreen
           isDark={isDark}
@@ -354,13 +358,19 @@ function SetupScreen({
   canGenerate: boolean;
   onGenerate: () => void;
 }) {
+  const buttonPressed = useSharedValue(0);
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withSpring(interpolate(buttonPressed.value, [0, 1], [1, 0.95]), { damping: 15, stiffness: 150 }) }],
+  }));
+
   return (
     <>
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <MaterialCommunityIcons
-            name="arrow-left"
-            size={24}
+            name="chevron-left"
+            size={22}
             color={isDark ? '#FFF' : '#000'}
           />
         </Pressable>
@@ -377,197 +387,220 @@ function SetupScreen({
         keyboardShouldPersistTaps="handled"
       >
         {/* Info Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: `${ACCENT_COLOR}33` },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <LinearGradient
-              colors={[`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconCircle}
-            >
-              <MaterialCommunityIcons name="head-snowflake-outline" size={20} color={ACCENT_COLOR} />
-            </LinearGradient>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                Visualization
-              </Text>
-              <Text style={styles.cardSubtitle}>Mental rehearsal</Text>
+        <ReAnimated.View entering={FadeInDown.delay(0).duration(500).springify().damping(16)}>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                borderColor: `${ACCENT_COLOR}33`,
+                boxShadow: isDark
+                  ? `0 8px 24px ${ACCENT_COLOR}25`
+                  : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${ACCENT_COLOR}30`,
+              },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <LinearGradient
+                colors={[`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.iconCircle}
+              >
+                <MaterialCommunityIcons name="head-snowflake-outline" size={20} color={ACCENT_COLOR} />
+              </LinearGradient>
+              <View style={styles.cardText}>
+                <Text style={[styles.cardTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                  Visualization
+                </Text>
+                <Text style={styles.cardSubtitle}>Mental rehearsal</Text>
+              </View>
             </View>
+            <Text style={styles.cardDescription}>
+              Describe your movement and cues. A personalized guided visualization will help you mentally prepare.
+            </Text>
           </View>
-          <Text style={styles.cardDescription}>
-            Describe your movement and cues. A personalized guided visualization will help you mentally prepare.
-          </Text>
-        </View>
+        </ReAnimated.View>
 
         {/* Movement Input */}
-        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
-          <View style={styles.inputHeader}>
-            <MaterialCommunityIcons name="dumbbell" size={16} color={ACCENT_COLOR} />
-            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
-              Movement & Weight
-            </Text>
+        <ReAnimated.View entering={FadeInDown.delay(50).duration(500).springify().damping(16)}>
+          <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+            <View style={styles.inputHeader}>
+              <MaterialCommunityIcons name="dumbbell" size={16} color={ACCENT_COLOR} />
+              <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                Movement & Weight
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: isDark ? `${ACCENT_COLOR}14` : `${ACCENT_COLOR}14`,
+                  color: isDark ? '#FFF' : '#000',
+                  borderColor: `${ACCENT_COLOR}26`,
+                  borderWidth: 1,
+                },
+              ]}
+              placeholder="e.g., 200kg Squat, 100kg Snatch"
+              placeholderTextColor="#666"
+              value={movement}
+              onChangeText={setMovement}
+            />
           </View>
-          <TextInput
-            style={[
-              styles.textInput,
-              {
-                backgroundColor: isDark ? `${ACCENT_COLOR}14` : `${ACCENT_COLOR}14`,
-                color: isDark ? '#FFF' : '#000',
-                borderColor: `${ACCENT_COLOR}26`,
-                borderWidth: 1,
-              },
-            ]}
-            placeholder="e.g., 200kg Squat, 100kg Snatch"
-            placeholderTextColor="#666"
-            value={movement}
-            onChangeText={setMovement}
-          />
-        </View>
+        </ReAnimated.View>
 
         {/* Cues Input */}
-        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
-          <View style={styles.inputHeader}>
-            <MaterialCommunityIcons name="target" size={16} color={ACCENT_COLOR} />
-            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
-              Focus Cues
-            </Text>
+        <ReAnimated.View entering={FadeInDown.delay(100).duration(500).springify().damping(16)}>
+          <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+            <View style={styles.inputHeader}>
+              <MaterialCommunityIcons name="target" size={16} color={ACCENT_COLOR} />
+              <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                Focus Cues
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.textInputMultiline,
+                {
+                  backgroundColor: `${ACCENT_COLOR}14`,
+                  color: isDark ? '#FFF' : '#000',
+                  borderColor: `${ACCENT_COLOR}26`,
+                  borderWidth: 1,
+                },
+              ]}
+              placeholder="Enter your personal cues and focus points..."
+              placeholderTextColor="#666"
+              value={cues}
+              onChangeText={setCues}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
           </View>
-          <TextInput
-            style={[
-              styles.textInputMultiline,
-              {
-                backgroundColor: `${ACCENT_COLOR}14`,
-                color: isDark ? '#FFF' : '#000',
-                borderColor: `${ACCENT_COLOR}26`,
-                borderWidth: 1,
-              },
-            ]}
-            placeholder="Enter your personal cues and focus points..."
-            placeholderTextColor="#666"
-            value={cues}
-            onChangeText={setCues}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
+        </ReAnimated.View>
 
         {/* Voice Selection */}
-        <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
-          <View style={styles.inputHeader}>
-            <MaterialCommunityIcons name="waveform" size={16} color={ACCENT_COLOR} />
-            <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
-              Voice
-            </Text>
-          </View>
-          <View style={styles.voiceOptions}>
-            {VOICES.map((voice) => {
-              const isSelected = selectedVoice.id === voice.id;
-              return (
-                <Pressable
-                  key={voice.id}
-                  onPress={() => setSelectedVoice(voice)}
-                  style={[
-                    styles.voiceOption,
-                    {
-                      backgroundColor: isSelected ? `${ACCENT_COLOR}14` : 'transparent',
-                      borderColor: isSelected ? `${ACCENT_COLOR}4D` : isDark ? '#333' : '#E5E5E5',
-                      borderWidth: isSelected ? 2 : 1,
-                    },
-                  ]}
-                >
-                  <LinearGradient
-                    colors={
-                      isSelected
-                        ? [`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]
-                        : [isDark ? '#333' : '#F0F0F0', isDark ? '#222' : '#E8E8E8']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.voiceIconCircle}
-                  >
-                    <MaterialCommunityIcons
-                      name="account-voice"
-                      size={18}
-                      color={isSelected ? ACCENT_COLOR : '#888'}
-                    />
-                  </LinearGradient>
-                  <Text
+        <ReAnimated.View entering={FadeInDown.delay(150).duration(500).springify().damping(16)}>
+          <View style={[styles.card, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]}>
+            <View style={styles.inputHeader}>
+              <MaterialCommunityIcons name="waveform" size={16} color={ACCENT_COLOR} />
+              <Text style={[styles.inputTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                Voice
+              </Text>
+            </View>
+            <View style={styles.voiceOptions}>
+              {VOICES.map((voice) => {
+                const isSelected = selectedVoice.id === voice.id;
+                return (
+                  <Pressable
+                    key={voice.id}
+                    onPress={() => setSelectedVoice(voice)}
                     style={[
-                      styles.voiceName,
+                      styles.voiceOption,
                       {
-                        color: isSelected ? ACCENT_COLOR : isDark ? '#FFF' : '#000',
+                        backgroundColor: isSelected ? `${ACCENT_COLOR}14` : 'transparent',
+                        borderColor: isSelected ? `${ACCENT_COLOR}4D` : isDark ? '#333' : '#E5E5E5',
+                        borderWidth: isSelected ? 2 : 1,
                       },
                     ]}
                   >
-                    {voice.name}
-                  </Text>
-                  <Text style={styles.voiceDescription}>{voice.description}</Text>
-                </Pressable>
-              );
-            })}
+                    <LinearGradient
+                      colors={
+                        isSelected
+                          ? [`${ACCENT_COLOR}40`, `${ACCENT_COLOR}1A`]
+                          : [isDark ? '#333' : '#F0F0F0', isDark ? '#222' : '#E8E8E8']
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.voiceIconCircle}
+                    >
+                      <MaterialCommunityIcons
+                        name="account-voice"
+                        size={18}
+                        color={isSelected ? ACCENT_COLOR : '#888'}
+                      />
+                    </LinearGradient>
+                    <Text
+                      style={[
+                        styles.voiceName,
+                        {
+                          color: isSelected ? ACCENT_COLOR : isDark ? '#FFF' : '#000',
+                        },
+                      ]}
+                    >
+                      {voice.name}
+                    </Text>
+                    <Text style={styles.voiceDescription}>{voice.description}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        </ReAnimated.View>
 
         {/* Cached Version Toggle */}
         {hasCachedVersion && (
-          <View
-            style={[
-              styles.cachedToggle,
-              {
-                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                borderColor: '#34C75933',
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={['#34C75940', '#34C7591A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.cachedIcon}
+          <ReAnimated.View entering={FadeInDown.delay(200).duration(500).springify().damping(16)}>
+            <View
+              style={[
+                styles.cachedToggle,
+                {
+                  backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                  borderColor: '#34C75933',
+                },
+              ]}
             >
-              <MaterialCommunityIcons name="download-circle" size={16} color="#34C759" />
-            </LinearGradient>
-            <View style={styles.cachedToggleText}>
-              <Text style={[styles.cachedToggleTitle, { color: isDark ? '#FFF' : '#000' }]}>
-                Saved Version Available
-              </Text>
-              <Text style={styles.cachedToggleSubtitle}>
-                Play without having to wait
-              </Text>
+              <LinearGradient
+                colors={['#34C75940', '#34C7591A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cachedIcon}
+              >
+                <MaterialCommunityIcons name="download-circle" size={16} color="#34C759" />
+              </LinearGradient>
+              <View style={styles.cachedToggleText}>
+                <Text style={[styles.cachedToggleTitle, { color: isDark ? '#FFF' : '#000' }]}>
+                  Saved Version Available
+                </Text>
+                <Text style={styles.cachedToggleSubtitle}>
+                  Play without having to wait
+                </Text>
+              </View>
+              <Switch
+                value={useCachedVersion}
+                onValueChange={setUseCachedVersion}
+                trackColor={{ false: isDark ? '#333' : '#E5E5E5', true: '#34C759' }}
+                thumbColor="#FFF"
+              />
             </View>
-            <Switch
-              value={useCachedVersion}
-              onValueChange={setUseCachedVersion}
-              trackColor={{ false: isDark ? '#333' : '#E5E5E5', true: '#34C759' }}
-              thumbColor="#FFF"
-            />
-          </View>
+          </ReAnimated.View>
         )}
 
         {/* Generate Button */}
-        <Pressable
-          onPress={onGenerate}
-          disabled={!canGenerate}
-          style={[styles.generateButton, { opacity: canGenerate ? 1 : 0.5 }]}
-        >
-          <LinearGradient
-            colors={canGenerate ? [ACCENT_COLOR, `${ACCENT_COLOR}D9`] : ['#888', '#666']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.generateButtonGradient}
+        <ReAnimated.View entering={FadeInDown.delay(250).duration(500).springify().damping(16)}>
+          <AnimatedPressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onGenerate();
+            }}
+            onPressIn={() => { buttonPressed.value = 1; }}
+            onPressOut={() => { buttonPressed.value = 0; }}
+            disabled={!canGenerate}
+            style={[styles.generateButton, { opacity: canGenerate ? 1 : 0.5 }, buttonAnimatedStyle]}
           >
-            <MaterialCommunityIcons name="waveform" size={18} color="#FFF" />
-            <Text style={styles.generateButtonText}>
-              {useCachedVersion ? 'Play Saved Visualization' : 'Generate Visualization'}
-            </Text>
-          </LinearGradient>
-        </Pressable>
+            <LinearGradient
+              colors={canGenerate ? [ACCENT_COLOR, `${ACCENT_COLOR}D9`] : ['#888', '#666']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.generateButtonGradient}
+            >
+              <MaterialCommunityIcons name="waveform" size={18} color="#FFF" />
+              <Text style={styles.generateButtonText}>
+                {useCachedVersion ? 'Play Saved Visualization' : 'Generate Visualization'}
+              </Text>
+            </LinearGradient>
+          </AnimatedPressable>
+        </ReAnimated.View>
       </ScrollView>
     </>
   );
@@ -978,7 +1011,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${ACCENT_COLOR}22`,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 17,
@@ -997,6 +1035,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'transparent',
+    borderCurve: 'continuous',
     gap: 12,
   },
   cardHeader: {
@@ -1113,6 +1152,7 @@ const styles = StyleSheet.create({
   },
   generateButton: {
     borderRadius: 14,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     marginTop: 8,
   },

@@ -44,7 +44,7 @@ export default function CheckInConfirmationScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
         <View style={styles.iconContainer}>
           <LinearGradient
@@ -70,8 +70,10 @@ export default function CheckInConfirmationScreen() {
             styles.scoreCard,
             {
               backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-              shadowColor: overallColor,
-              borderColor: `${overallColor}40`,
+              borderColor: isDark ? `${overallColor}40` : `${overallColor}20`,
+              boxShadow: isDark
+                ? `0 8px 24px ${overallColor}25`
+                : `0 1px 3px rgba(0,0,0,0.08), 0 8px 24px ${overallColor}35`,
             },
           ]}
         >
@@ -95,7 +97,12 @@ export default function CheckInConfirmationScreen() {
           <View
             style={[
               styles.breakdownCard,
-              { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' },
+              {
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                boxShadow: isDark
+                  ? '0 4px 12px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+              },
             ]}
           >
             <Text style={styles.breakdownLabel}>Physical</Text>
@@ -106,7 +113,12 @@ export default function CheckInConfirmationScreen() {
           <View
             style={[
               styles.breakdownCard,
-              { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' },
+              {
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                boxShadow: isDark
+                  ? '0 4px 12px rgba(0,0,0,0.2)'
+                  : '0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+              },
             ]}
           >
             <Text style={styles.breakdownLabel}>Mental</Text>
@@ -168,12 +180,9 @@ const styles = StyleSheet.create({
   scoreCard: {
     padding: 24,
     borderRadius: 24,
+    borderCurve: 'continuous',
     borderWidth: 1,
     alignItems: 'center',
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
     marginBottom: 16,
   },
   scoreLabel: {
@@ -211,13 +220,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderRadius: 16,
+    borderCurve: 'continuous',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   breakdownLabel: {
     fontSize: 14,

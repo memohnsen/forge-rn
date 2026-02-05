@@ -38,8 +38,10 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
         styles.container,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          shadowColor: colors.blueEnergy,
-          borderColor: `${colors.blueEnergy}33`,
+          borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+          boxShadow: isDark
+            ? `0 4px 12px ${colors.blueEnergy}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
         },
       ]}
     >
@@ -91,11 +93,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 18,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
   },
   header: {
     flexDirection: 'row',

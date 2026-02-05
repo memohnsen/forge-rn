@@ -115,7 +115,7 @@ export default function SettingsScreen() {
     <View
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#000000' : '#F5F5F5', paddingTop: insets.top + 16 },
+        { backgroundColor: isDark ? '#000000' : '#F2F2F7', paddingTop: insets.top + 16 },
       ]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -245,8 +245,10 @@ function SettingsRow({
         styles.rowCard,
         {
           backgroundColor: isDark ? '#111111' : '#FFFFFF',
-          borderColor: `${(isDanger ? '#DC5A5A' : accentColor)}33`,
-          shadowColor: isDanger ? '#DC5A5A' : accentColor,
+          borderColor: isDark ? `${(isDanger ? '#DC5A5A' : accentColor)}33` : `${(isDanger ? '#DC5A5A' : accentColor)}20`,
+          boxShadow: isDark
+            ? `0 4px 12px ${(isDanger ? '#DC5A5A' : accentColor)}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${(isDanger ? '#DC5A5A' : accentColor)}30`,
           opacity: disabled ? 0.6 : 1,
         },
       ]}
@@ -296,11 +298,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     borderRadius: 16,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
   },
   rowIcon: {
     marginRight: 12,

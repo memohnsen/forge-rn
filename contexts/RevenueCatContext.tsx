@@ -12,6 +12,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '@clerk/clerk-expo';
 import Purchases, { CustomerInfo, CustomerInfoUpdateListener } from 'react-native-purchases';
 import { useRevenueCat } from '@/hooks/use-revenuecat';
+import { devConfig } from '@/constants/dev-config';
 
 type RevenueCatContextValue = {
   customerInfo: CustomerInfo | null;
@@ -38,8 +39,9 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useRevenueCat();
 
   const isRevenueCatEnabled = Platform.OS !== 'web' && Boolean(revenueCatApiKey);
+  const hasDevSubOverride = devConfig.subStatusOverride !== null;
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
-  const [hasProAccess, setHasProAccess] = useState(false);
+  const [hasProAccess, setHasProAccess] = useState(devConfig.subStatusOverride ?? false);
   const [isEntitlementsLoading, setIsEntitlementsLoading] = useState(isRevenueCatEnabled);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const previousUserIdRef = useRef<string | null>(null);
@@ -60,6 +62,9 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 
   const refreshCustomerInfo = useCallback(async () => {
+    if (hasDevSubOverride) {
+      return devConfig.subStatusOverride ?? false;
+    }
     if (!isRevenueCatEnabled) return true;
     if (!userId) return false;
 
@@ -76,7 +81,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsEntitlementsLoading(false);
     }
-  }, [hasProAccess, isRevenueCatEnabled, updateCustomerInfo, userId]);
+  }, [hasDevSubOverride, hasProAccess, isRevenueCatEnabled, updateCustomerInfo, userId]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -90,7 +95,13 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     if (!isSignedIn || !userId) {
       setCustomerInfo(null);
-      setHasProAccess(false);
+      setHasProAccess(devConfig.subStatusOverride ?? false);
+      setIsEntitlementsLoading(false);
+      return;
+    }
+
+    if (hasDevSubOverride) {
+      setHasProAccess(devConfig.subStatusOverride ?? false);
       setIsEntitlementsLoading(false);
       return;
     }
@@ -126,9 +137,10 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return () => {
       isActive = false;
     };
-  }, [getCacheKey, isLoaded, isRevenueCatEnabled, isSignedIn, refreshCustomerInfo, userId]);
+  }, [getCacheKey, hasDevSubOverride, isLoaded, isRevenueCatEnabled, isSignedIn, refreshCustomerInfo, userId]);
 
   useEffect(() => {
+    if (hasDevSubOverride) return;
     if (!isRevenueCatEnabled) return;
     if (!userId) return;
 
@@ -141,7 +153,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return () => {
       Purchases.removeCustomerInfoUpdateListener(listener);
     };
-  }, [isRevenueCatEnabled, updateCustomerInfo, userId]);
+  }, [hasDevSubOverride, isRevenueCatEnabled, updateCustomerInfo, userId]);
 
   const value = useMemo(
     () => ({

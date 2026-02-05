@@ -8,6 +8,7 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -18,14 +19,23 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   useColorScheme,
   View,
 } from 'react-native';
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Check for iOS 26+ (iOS 26 = version 26.0)
 const isIOS26OrLater = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 26;
@@ -65,6 +75,14 @@ export default function HomeScreen() {
   const [newMeetName, setNewMeetName] = useState('');
   const [newMeetDate, setNewMeetDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const profilePressed = useSharedValue(0);
+
+  const profileAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: withSpring(interpolate(profilePressed.value, [0, 1], [1, 0.88]), { damping: 12, stiffness: 300 }) },
+    ],
+  }));
 
   useEffect(() => {
     trackScreenView('home');
@@ -161,40 +179,55 @@ export default function HomeScreen() {
   const profileInitial = (clerkUser?.firstName || firstName).charAt(0).toUpperCase();
 
   const HeaderContent = () => (
-    <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.dateText}>{formattedToday}</Text>
-          <Text style={[styles.greetingText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+    <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>{formattedToday}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#FFFFFF' : '#000000' }}>
             Ready to train, {firstName}?
           </Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/profile')}
+        <AnimatedPressable
+          onPress={() => {
+            if (process.env.EXPO_OS === 'ios') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            router.push('/profile');
+          }}
+          onPressIn={() => { profilePressed.value = withTiming(1, { duration: 100 }); }}
+          onPressOut={() => { profilePressed.value = withSpring(0, { damping: 12, stiffness: 300 }); }}
           style={[
-            styles.profileButton,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
+            profileAnimatedStyle,
+            {
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            },
           ]}
           accessibilityRole="button"
           accessibilityLabel="Open profile"
         >
           {clerkUser?.imageUrl ? (
-            <Image source={{ uri: clerkUser.imageUrl }} style={styles.profileAvatar} />
+            <Image source={{ uri: clerkUser.imageUrl }} style={{ width: 44, height: 44, borderRadius: 22 }} />
           ) : (
-            <Text style={[styles.profileInitial, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#FFFFFF' : '#000000' }}>
               {profileInitial}
             </Text>
           )}
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
+    <View style={{ flex: 1, backgroundColor: isDark ? '#000000' : '#F2F2F7' }}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 16 }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ gap: 16, paddingBottom: 100, paddingTop: headerHeight + 16 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -227,21 +260,30 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* Glass/Blur Header Overlay */}
-      <View style={[styles.headerOverlay, { height: headerHeight }]}>
+      <Animated.View
+        entering={FadeIn.duration(400)}
+        style={{
+          position: 'absolute',
+          top: -10,
+          left: -3,
+          right: -3,
+          height: headerHeight,
+        }}
+      >
         {isIOS26OrLater ? (
-          <GlassView style={styles.headerBlur}>
+          <GlassView style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden' }}>
             <HeaderContent />
           </GlassView>
         ) : (
           <BlurView
             intensity={80}
             tint={isDark ? 'dark' : 'light'}
-            style={styles.headerBlur}
+            style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden' }}
           >
             <HeaderContent />
           </BlurView>
         )}
-      </View>
+      </Animated.View>
 
       <Modal
         visible={editMeetSheetShown}
@@ -249,32 +291,49 @@ export default function HomeScreen() {
         animationType="slide"
         onRequestClose={() => setEditMeetSheetShown(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View
-            style={[styles.modalContent, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}
+            style={{
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              borderCurve: 'continuous',
+              paddingBottom: 32,
+              backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+            }}
           >
-            <View style={styles.modalHeader}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: 'rgba(0,0,0,0.1)',
+              }}
+            >
               <Pressable onPress={() => setEditMeetSheetShown(false)}>
-                <Text style={styles.cancelButton}>Cancel</Text>
+                <Text style={{ fontSize: 17, color: '#FF3B30' }}>Cancel</Text>
               </Pressable>
-              <Text style={[styles.modalTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              <Text style={{ fontSize: 17, fontWeight: '600', color: isDark ? '#FFFFFF' : '#000000' }}>
                 Edit Meet
               </Text>
               <Pressable onPress={handleSaveMeet}>
-                <Text style={styles.saveButton}>Save</Text>
+                <Text style={{ fontSize: 17, fontWeight: '600', color: '#5386E4' }}>Save</Text>
               </Pressable>
             </View>
 
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Meet Name</Text>
+            <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#999', marginBottom: 8 }}>Meet Name</Text>
               <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
-                    color: isDark ? '#FFFFFF' : '#000000',
-                  },
-                ]}
+                style={{
+                  borderRadius: 12,
+                  borderCurve: 'continuous',
+                  padding: 12,
+                  fontSize: 16,
+                  backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                  color: isDark ? '#FFFFFF' : '#000000',
+                }}
                 value={newMeetName}
                 onChangeText={setNewMeetName}
                 placeholder="Meet Name"
@@ -282,16 +341,16 @@ export default function HomeScreen() {
               />
             </View>
 
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Meet Date</Text>
+            <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#999', marginBottom: 8 }}>Meet Date</Text>
               {Platform.OS === 'android' && (
                 <Pressable
-                  style={[
-                    styles.dateButton,
-                    {
-                      backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
-                    },
-                  ]}
+                  style={{
+                    borderRadius: 12,
+                    borderCurve: 'continuous',
+                    padding: 12,
+                    backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                  }}
                   onPress={() => setShowDatePicker(true)}
                 >
                   <Text style={{ color: isDark ? '#FFFFFF' : '#000000' }}>
@@ -316,7 +375,7 @@ export default function HomeScreen() {
             )}
             {Platform.OS === 'ios' && (
               <DateTimePicker
-               style={{ marginLeft: 8 }}
+                style={{ marginLeft: 8 }}
                 value={newMeetDate}
                 mode="date"
                 display="default"
@@ -334,123 +393,3 @@ export default function HomeScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  headerOverlay: {
-    position: 'absolute',
-    top: -10,
-    left: -3,
-    right: -3,
-  },
-  headerBlur: {
-    flex: 1,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    overflow: 'hidden',
-  },
-  headerContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    justifyContent: 'flex-end',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-  },
-  headerLeft: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  profileAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  profileInitial: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 4,
-  },
-  greetingText: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    gap: 16,
-    paddingBottom: 100,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    fontSize: 17,
-    color: '#FF3B30',
-  },
-  saveButton: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#5386E4',
-  },
-  formSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#999',
-    marginBottom: 8,
-  },
-  input: {
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-  },
-  dateButton: {
-    borderRadius: 12,
-    padding: 12,
-  },
-  dateRow: {
-    paddingVertical: 6,
-  },
-});
