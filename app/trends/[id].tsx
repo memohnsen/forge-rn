@@ -5,13 +5,12 @@ import { buildGraphDetailState } from '@/utils/trends-graph-detail-model';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  Platform,
   useColorScheme,
   View,
 } from 'react-native';
@@ -32,16 +31,6 @@ export default function GraphDetailScreen() {
 
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
   const [dateRangeEnd, setDateRangeEnd] = useState(new Date());
-
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (event.data.action.type !== 'GO_BACK') return;
-      event.preventDefault();
-      router.replace('/trends');
-    });
-    return unsubscribe;
-  }, [navigation, router]);
 
   if (isLoading && !chart) {
     return (
@@ -103,7 +92,16 @@ export default function GraphDetailScreen() {
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.replace('/trends')} style={styles.backButton}>
+          <Pressable
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                router.back();
+                return;
+              }
+              router.replace('/(tabs)/trends');
+            }}
+            style={styles.backButton}
+          >
             <MaterialCommunityIcons name="chevron-left" size={22} color="#FFFFFF" />
           </Pressable>
           <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
