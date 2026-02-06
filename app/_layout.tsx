@@ -1,5 +1,6 @@
 import { SplashScreen } from '@/components/SplashScreen';
 import { RevenueCatProvider, useRevenueCatContext } from '@/contexts/RevenueCatContext';
+import { useEasUpdates } from '@/hooks/use-eas-updates';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import {
   identifyUser,
@@ -288,6 +289,8 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
+  useEasUpdates();
+
   const content = (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
       <ClerkLoaded>

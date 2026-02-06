@@ -68,6 +68,12 @@ export default {
         projectId: "21a35af4-b604-4bcd-a950-0f035cc4a67e"
       }
     },
-    owner: "memohnsen"
+    owner: "memohnsen",
+    updates: {
+    url: "https://u.expo.dev/21a35af4-b604-4bcd-a950-0f035cc4a67e"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    }
   }
 }
