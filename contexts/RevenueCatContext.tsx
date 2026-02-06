@@ -13,6 +13,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import Purchases, { CustomerInfo, CustomerInfoUpdateListener } from 'react-native-purchases';
 import { useRevenueCat } from '@/hooks/use-revenuecat';
 import { devConfig } from '@/constants/dev-config';
+import { revenueCatApiKey } from '@/constants/revenuecat';
 
 type RevenueCatContextValue = {
   customerInfo: CustomerInfo | null;
@@ -25,8 +26,6 @@ type RevenueCatContextValue = {
 };
 
 const RevenueCatContext = createContext<RevenueCatContextValue | undefined>(undefined);
-
-const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
 
 const hasActiveEntitlements = (info?: CustomerInfo | null) => {
   if (!info) return false;

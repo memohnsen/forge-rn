@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import Purchases from 'react-native-purchases';
-
-const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
+import { revenueCatApiKey } from '@/constants/revenuecat';
 
 export const useRevenueCat = () => {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -14,7 +13,9 @@ export const useRevenueCat = () => {
     if (!isLoaded) return;
     if (!revenueCatApiKey) {
       if (__DEV__) {
-        console.warn('[RevenueCat] Missing EXPO_PUBLIC_REVENUECAT_KEY');
+        console.warn(
+          '[RevenueCat] Missing platform key. Set EXPO_PUBLIC_REVENUECAT_IOS_KEY and EXPO_PUBLIC_REVENUECAT_ANDROID_KEY.'
+        );
       }
       return;
     }
