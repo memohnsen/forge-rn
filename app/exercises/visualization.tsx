@@ -22,15 +22,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ReAnimated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming, interpolate } from 'react-native-reanimated';
+import ReAnimated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, interpolate } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { textToSpeech, VoiceOption, VOICES } from '@/services/elevenlabs';
-import { queryOpenRouter } from '@/services/openrouter';
+import { VoiceOption, VOICES } from '@/services/elevenlabs';
 import { createClerkSupabaseClient } from '@/services/supabase';
+import { generateVisualizationAudio } from '@/services/visualization-generation';
 import {
   trackScreenView,
   trackVisualizationGenerated,
+  trackVisualizationLatencyMeasured,
   trackVisualizationPlayed,
   trackVisualizationScriptViewed,
 } from '@/utils/analytics';
@@ -42,6 +43,21 @@ const CACHE_DIR = `${FileSystem.cacheDirectory}visualizations/`;
 const AnimatedPressable = ReAnimated.createAnimatedComponent(Pressable);
 
 type ScreenState = 'setup' | 'generating' | 'player';
+type GenerationSource = 'cache' | 'combined' | 'legacy';
+
+type VisualizationGenerationTiming = {
+  source: GenerationSource;
+  generationStartedAt: number;
+  totalGenerationMs?: number;
+  tokenMs?: number;
+  openRouterMs?: number;
+  textToSpeechMs?: number;
+  combinedRequestMs?: number;
+  base64EncodeMs?: number;
+  audioWriteMs?: number;
+};
+
+const PREFETCH_TOKEN_TTL_MS = 45_000;
 
 export default function VisualizationScreen() {
   const colorScheme = useColorScheme();
@@ -58,6 +74,9 @@ export default function VisualizationScreen() {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [generatedScript, setGeneratedScript] = useState('');
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [latestGenerationTiming, setLatestGenerationTiming] = useState<VisualizationGenerationTiming | null>(null);
+  const [prefetchedToken, setPrefetchedToken] = useState<string | null>(null);
+  const prefetchedTokenAtRef = useRef<number>(0);
 
   const [hasCachedVersion, setHasCachedVersion] = useState(false);
   const [useCachedVersion, setUseCachedVersion] = useState(false);
@@ -95,6 +114,29 @@ export default function VisualizationScreen() {
       hasTrackedScreen.current = true;
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function prefetchToken() {
+      if (!userId || screenState !== 'setup') return;
+
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (cancelled || !token) return;
+        setPrefetchedToken(token);
+        prefetchedTokenAtRef.current = Date.now();
+      } catch (error) {
+        console.log('Failed to prefetch supabase token:', error);
+      }
+    }
+
+    prefetchToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, screenState, userId]);
 
   // Check for cached version when inputs change
   useEffect(() => {
@@ -144,39 +186,32 @@ export default function VisualizationScreen() {
     }
   }
 
-  function buildVisualizationPrompt(): string {
-    return `You are a professional ${userSport} coach creating a guided visualization script for an athlete preparing for a movement.
+  async function getSupabaseTokenForGeneration(): Promise<{ token: string; tokenMs: number }> {
+    const tokenStart = Date.now();
+    const hasFreshPrefetch =
+      prefetchedToken && Date.now() - prefetchedTokenAtRef.current < PREFETCH_TOKEN_TTL_MS;
 
-The athlete wants to visualize: ${movement}
-Their personal cues to focus on: ${cues}
+    if (hasFreshPrefetch && prefetchedToken) {
+      return {
+        token: prefetchedToken,
+        tokenMs: Date.now() - tokenStart,
+      };
+    }
 
-Create a calming, focused visualization script that:
-1. Starts by having them close their eyes and take deep breaths
-2. Guides them to visualize approaching and setting up for the movement
-3. Walks through the setup phase incorporating their specific cues
-4. Describes the execution with vivid sensory detail
-5. Emphasizes feeling strong, confident, and in control
-6. Ends with successfully completing the movement and the feeling of accomplishment
-
-Tone:
-- Sound confident, but not robotic. Remember you're speaking to a person.
-
-IMPORTANT FORMATTING RULES:
-- Include <break time="3.0s" /> tags between major steps to give the athlete time to visualize
-- Use <break time="2.0s" /> for shorter pauses between sentences within a section
-- Use <break time="1.0s" /> for brief pauses for emphasis
-- Keep the total script around 2-3 minutes when read aloud
-- Use second person ("you") to speak directly to the athlete
-- Keep sentences short and easy to follow
-- Use a calm, confident, encouraging tone
-
-Example pacing:
-"Close your eyes and take a deep breath in... <break time="2.0s" /> And slowly release. <break time="2.0s" /> Feel your body becoming calm and focused. <break time="3.0s" />"
-
-Generate only the script text, no titles or headers. Start directly with the visualization guidance.`;
+    const token = await getToken({ template: 'supabase' });
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    setPrefetchedToken(token);
+    prefetchedTokenAtRef.current = Date.now();
+    return {
+      token,
+      tokenMs: Date.now() - tokenStart,
+    };
   }
 
   async function handleGenerate() {
+    const generationStartedAt = Date.now();
     const key = getCacheKey(movement, cues, selectedVoice.id);
     const audioPath = `${CACHE_DIR}${key}.mp3`;
     const scriptPath = `${CACHE_DIR}${key}.txt`;
@@ -194,6 +229,11 @@ Generate only the script text, no titles or headers. Start directly with the vis
           const cachedScript = await FileSystem.readAsStringAsync(scriptPath);
           setGeneratedScript(cachedScript);
           setAudioUri(audioPath);
+          setLatestGenerationTiming({
+            source: 'cache',
+            generationStartedAt,
+            totalGenerationMs: Date.now() - generationStartedAt,
+          });
           setScreenState('player');
           trackVisualizationGenerated(
             movement,
@@ -215,50 +255,121 @@ Generate only the script text, no titles or headers. Start directly with the vis
     setIsGeneratingScript(true);
 
     try {
-      const token = await getToken({ template: 'supabase' });
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      // Generate script
-      const prompt = buildVisualizationPrompt();
-      const script = await queryOpenRouter({
-        prompt,
-        token,
-        purpose: 'visualization_script',
-      });
-      setGeneratedScript(script);
-      setIsGeneratingScript(false);
-
-      // Generate audio
-      const audioData = await textToSpeech({
-        text: script,
+      const { token, tokenMs } = await getSupabaseTokenForGeneration();
+      const generationRequestStart = Date.now();
+      const result = await generateVisualizationAudio({
+        movement,
+        cues,
         voiceId: selectedVoice.id,
+        userSport,
         token,
         stability: 0.6,
         similarityBoost: 0.8,
       });
-
-      // Save to cache
+      const combinedRequestMs = Date.now() - generationRequestStart;
+      const script = result.script;
+      setGeneratedScript(script);
+      setIsGeneratingScript(false);
       await ensureCacheDir();
-      const audioBase64 = arrayBufferToBase64(audioData);
-      await FileSystem.writeAsStringAsync(audioPath, audioBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      await FileSystem.writeAsStringAsync(scriptPath, script);
 
-      setAudioUri(audioPath);
-      setScreenState('player');
-      trackVisualizationGenerated(
-        movement,
-        cues.length,
-        selectedVoice.name,
-        userSport,
-        false,
-        true
-      );
+      if (result.audioUrl) {
+        const timing: VisualizationGenerationTiming = {
+          source: result.source,
+          generationStartedAt,
+          totalGenerationMs: Date.now() - generationStartedAt,
+          tokenMs,
+          openRouterMs: result.timingsMs?.openRouter,
+          textToSpeechMs: result.timingsMs?.textToSpeech,
+          combinedRequestMs,
+        };
+        console.log('Visualization generation timings', timing);
+
+        setLatestGenerationTiming(timing);
+        setAudioUri(result.audioUrl);
+        setScreenState('player');
+
+        void (async () => {
+          try {
+            await FileSystem.downloadAsync(result.audioUrl, audioPath);
+            await FileSystem.writeAsStringAsync(scriptPath, script);
+          } catch (backgroundError) {
+            console.log('Background visualization cache write failed:', backgroundError);
+          }
+        })();
+      } else if (result.audioBase64) {
+        const audioWriteStart = Date.now();
+        await FileSystem.writeAsStringAsync(audioPath, result.audioBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const audioWriteMs = Date.now() - audioWriteStart;
+
+        const timing: VisualizationGenerationTiming = {
+          source: result.source,
+          generationStartedAt,
+          totalGenerationMs: Date.now() - generationStartedAt,
+          tokenMs,
+          openRouterMs: result.timingsMs?.openRouter,
+          textToSpeechMs: result.timingsMs?.textToSpeech,
+          combinedRequestMs,
+          audioWriteMs,
+        };
+        console.log('Visualization generation timings', timing);
+
+        setLatestGenerationTiming(timing);
+        setAudioUri(audioPath);
+        setScreenState('player');
+
+        void FileSystem.writeAsStringAsync(scriptPath, script).catch((backgroundError) => {
+          console.log('Background script cache write failed:', backgroundError);
+        });
+      } else if (result.audioData) {
+        const base64Start = Date.now();
+        const audioBase64 = arrayBufferToBase64(result.audioData);
+        const base64EncodeMs = Date.now() - base64Start;
+
+        const audioWriteStart = Date.now();
+        await FileSystem.writeAsStringAsync(audioPath, audioBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const audioWriteMs = Date.now() - audioWriteStart;
+
+        const timing: VisualizationGenerationTiming = {
+          source: result.source,
+          generationStartedAt,
+          totalGenerationMs: Date.now() - generationStartedAt,
+          tokenMs,
+          openRouterMs: result.timingsMs?.openRouter,
+          textToSpeechMs: result.timingsMs?.textToSpeech,
+          combinedRequestMs,
+          base64EncodeMs,
+          audioWriteMs,
+        };
+        console.log('Visualization generation timings', timing);
+
+        setLatestGenerationTiming(timing);
+        setAudioUri(audioPath);
+        setScreenState('player');
+
+        void FileSystem.writeAsStringAsync(scriptPath, script).catch((backgroundError) => {
+          console.log('Background script cache write failed:', backgroundError);
+        });
+      } else {
+        throw new Error('Generation failed: missing audio payload');
+      }
+
+      void Promise.resolve().then(() => {
+        trackVisualizationGenerated(
+          movement,
+          cues.length,
+          selectedVoice.name,
+          userSport,
+          false,
+          true
+        );
+      });
     } catch (error) {
       console.error('Generation error:', error);
+      setIsGeneratingScript(false);
       trackVisualizationGenerated(
         movement,
         cues.length,
@@ -283,6 +394,7 @@ Generate only the script text, no titles or headers. Start directly with the vis
   function handlePlayerComplete() {
     setScreenState('setup');
     setAudioUri(null);
+    setLatestGenerationTiming(null);
   }
 
   return (
@@ -321,6 +433,7 @@ Generate only the script text, no titles or headers. Start directly with the vis
           script={generatedScript}
           movement={movement}
           voiceName={selectedVoice.name}
+          generationTiming={latestGenerationTiming}
           onComplete={handlePlayerComplete}
         />
       )}
@@ -672,6 +785,7 @@ function PlayerScreen({
   script,
   movement,
   voiceName,
+  generationTiming,
   onComplete,
 }: {
   isDark: boolean;
@@ -680,9 +794,9 @@ function PlayerScreen({
   script: string;
   movement: string;
   voiceName: string;
+  generationTiming: VisualizationGenerationTiming | null;
   onComplete: () => void;
 }) {
-  const modalInsets = useSafeAreaInsets();
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -690,6 +804,9 @@ function PlayerScreen({
   const [showScript, setShowScript] = useState(false);
   const hasTrackedPlayback = useRef(false);
   const hasTrackedScriptView = useRef(false);
+  const hasTrackedLatency = useRef(false);
+  const hasSeenFirstAudioFrame = useRef(false);
+  const audioCreateMsRef = useRef<number | null>(null);
 
   // Mutable ref to track the Audio.Sound instance for cleanup
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -755,11 +872,13 @@ function PlayerScreen({
         staysActiveInBackground: true,
       });
 
+      const createAudioStart = Date.now();
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUri },
         { shouldPlay: true },
         onPlaybackStatusUpdate
       );
+      audioCreateMsRef.current = Date.now() - createAudioStart;
 
       // Store in both ref (for cleanup) and state (for UI)
       soundRef.current = newSound;
@@ -776,6 +895,26 @@ function PlayerScreen({
       setDuration(status.durationMillis || 0);
       setPosition(status.positionMillis || 0);
       setIsPlaying(status.isPlaying);
+
+      if (status.isPlaying && !hasSeenFirstAudioFrame.current) {
+        hasSeenFirstAudioFrame.current = true;
+        if (generationTiming && !hasTrackedLatency.current) {
+          const metrics = {
+            totalGenerationMs: generationTiming.totalGenerationMs,
+            tokenMs: generationTiming.tokenMs,
+            openRouterMs: generationTiming.openRouterMs,
+            textToSpeechMs: generationTiming.textToSpeechMs,
+            combinedRequestMs: generationTiming.combinedRequestMs,
+            base64EncodeMs: generationTiming.base64EncodeMs,
+            audioWriteMs: generationTiming.audioWriteMs,
+            audioCreateMs: audioCreateMsRef.current ?? undefined,
+            timeToFirstAudioMs: Date.now() - generationTiming.generationStartedAt,
+          };
+          console.log('Visualization end-to-end timings', metrics);
+          trackVisualizationLatencyMeasured(movement, voiceName, metrics, generationTiming.source);
+          hasTrackedLatency.current = true;
+        }
+      }
 
       if (status.didJustFinish) {
         setIsPlaying(false);

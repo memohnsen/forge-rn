@@ -339,6 +339,30 @@ export function trackVisualizationScriptViewed(movement: string) {
   capture('visualization_script_viewed', { movement });
 }
 
+export function trackVisualizationLatencyMeasured(
+  movement: string,
+  voice: string,
+  phasesMs: {
+    totalGenerationMs?: number;
+    tokenMs?: number;
+    openRouterMs?: number;
+    textToSpeechMs?: number;
+    combinedRequestMs?: number;
+    base64EncodeMs?: number;
+    audioWriteMs?: number;
+    audioCreateMs?: number;
+    timeToFirstAudioMs?: number;
+  },
+  source: 'cache' | 'combined' | 'legacy'
+) {
+  capture('visualization_latency_measured', {
+    movement,
+    voice,
+    source,
+    ...phasesMs,
+  });
+}
+
 export function trackMentalExerciseStarted(exerciseType: string) {
   capture('mental_exercise_started', { exercise_type: exerciseType });
 }

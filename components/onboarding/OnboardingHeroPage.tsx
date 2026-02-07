@@ -27,6 +27,10 @@ interface OnboardingHeroPageProps {
   onNext: () => void;
   currentStep: number;
   totalSteps: number;
+  secondaryAction?: {
+    label: string;
+    onPress: () => void;
+  };
 }
 
 export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
@@ -34,6 +38,7 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
   onNext,
   currentStep,
   totalSteps,
+  secondaryAction,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -224,6 +229,14 @@ export const OnboardingHeroPage: React.FC<OnboardingHeroPageProps> = ({
             </LinearGradient>
           </Pressable>
         </Animated.View>
+
+        {secondaryAction ? (
+          <Pressable style={styles.secondaryActionButton} onPress={secondaryAction.onPress}>
+            <Text style={[styles.secondaryActionText, { color: isDark ? '#9AA3B2' : '#6B7280' }]}>
+              {secondaryAction.label}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -360,5 +373,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  secondaryActionButton: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  secondaryActionText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

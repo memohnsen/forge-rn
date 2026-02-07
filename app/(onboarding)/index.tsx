@@ -290,6 +290,42 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleDevSkipOnboarding = async () => {
+    if (!__DEV__ || isLoading) return;
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      if (!userId) {
+        await SecureStore.setItemAsync('hasSeenOnboarding_device', 'true');
+        trackOnboardingCompleted();
+        setOnboardingCompleted(true);
+        router.replace('/(auth)/sign-in');
+        return;
+      }
+
+      await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');
+      await SecureStore.deleteItemAsync(`forceOnboarding_${userId}`);
+      trackOnboardingCompleted();
+      setOnboardingCompleted(true);
+
+      if (!isRevenueCatEnabled) {
+        router.replace('/(tabs)');
+        return;
+      }
+
+      const hasAccess = hasProAccess || (await refreshCustomerInfo());
+      router.replace(hasAccess ? '/(tabs)' : '/(paywall)');
+    } catch (err: unknown) {
+      console.error('Error skipping onboarding in dev:', err);
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const toggleTrainingDay = (day: string) => {
     const newDays = { ...data.trainingDays };
     if (newDays[day]) {
@@ -316,6 +352,14 @@ export default function OnboardingScreen() {
         onNext={nextPage}
         currentStep={currentPage}
         totalSteps={4}
+        secondaryAction={
+          __DEV__ && currentPage === 1
+            ? {
+                label: 'Skip onboarding (Dev)',
+                onPress: handleDevSkipOnboarding,
+              }
+            : undefined
+        }
       />
     );
   }
