@@ -269,6 +269,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setPerformanceRating}
           minString="Poor"
           maxString="Amazing"
+          colorByRating
         />
 
         <SliderSection
@@ -277,6 +278,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setPhysicalPreparedness}
           minString="Poor"
           maxString="Amazing"
+          colorByRating
         />
 
         <SliderSection
@@ -285,6 +287,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setMentalPreparedness}
           minString="Poor"
           maxString="Amazing"
+          colorByRating
         />
 
         <SliderSection
@@ -293,6 +296,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setPressureHandling}
           minString="Poorly"
           maxString="Very Well"
+          colorByRating
         />
 
         <SliderSection
@@ -301,6 +305,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setSatisfaction}
           minString="Not Satisfied"
           maxString="Very Satisfied"
+          colorByRating
         />
 
         <SliderSection
@@ -309,6 +314,7 @@ export default function CompetitionReflectionScreen() {
           onValueChange={setConfidence}
           minString="Not Confident"
           maxString="Very Confident"
+          colorByRating
         />
 
         <TextFieldSection

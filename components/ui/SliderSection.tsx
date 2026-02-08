@@ -5,6 +5,8 @@ import React from 'react';
 import { StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 
+const DRAG_HANDLE_SIZE = 32;
+
 interface SliderSectionProps {
   title: string;
   value: number;
@@ -14,6 +16,7 @@ interface SliderSectionProps {
   minValue?: number;
   maxValue?: number;
   inverseColorRating?: boolean;
+  colorByRating?: boolean;
 }
 
 export const SliderSection: React.FC<SliderSectionProps> = ({
@@ -25,12 +28,25 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
   minValue = 1,
   maxValue = 5,
   inverseColorRating = false,
+  colorByRating = false,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const [sliderWidth, setSliderWidth] = React.useState(0);
 
-  // Always use blueEnergy color for sliders
-  const ratingColor = colors.blueEnergy;
+  const range = Math.max(maxValue - minValue, 1);
+  const normalizedValue = Math.min(Math.max((value - minValue) / range, 0), 1);
+  const normalizedRating = inverseColorRating ? 1 - normalizedValue : normalizedValue;
+
+  const ratingColor = colorByRating
+    ? normalizedRating <= 0.4
+      ? colors.scoreRed
+      : normalizedRating >= 0.6
+        ? colors.scoreGreen
+        : colors.blueEnergy
+    : colors.blueEnergy;
+
+  const dragHandleX = sliderWidth * normalizedValue;
 
   return (
     <View
@@ -64,19 +80,42 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
           </View>
         </View>
 
-        <Slider
-          style={styles.slider}
-          minimumValue={minValue}
-          maximumValue={maxValue}
-          step={1}
-          value={value}
-          onValueChange={(val) => onValueChange(Math.round(val))}
-          onSlidingComplete={(val) => onValueChange(Math.round(val))}
-          minimumTrackTintColor={ratingColor}
-          maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
-          thumbTintColor={ratingColor}
-          tapToSeek
-        />
+        <View
+          style={styles.sliderWrapper}
+          onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
+        >
+          <Slider
+            style={styles.slider}
+            minimumValue={minValue}
+            maximumValue={maxValue}
+            step={1}
+            value={value}
+            onValueChange={(val) => onValueChange(Math.round(val))}
+            onSlidingComplete={(val) => onValueChange(Math.round(val))}
+            minimumTrackTintColor={ratingColor}
+            maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
+            thumbTintColor="transparent"
+            tapToSeek
+          />
+          <View
+            pointerEvents="none"
+            style={[
+              styles.dragHandle,
+              {
+                left: Math.max(0, Math.min(dragHandleX - DRAG_HANDLE_SIZE / 2, sliderWidth - DRAG_HANDLE_SIZE)),
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[ratingColor, `${ratingColor}CC`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.dragHandleInner}
+            >
+              <Ionicons name="reorder-horizontal" size={20} color="#FFFFFF" />
+            </LinearGradient>
+          </View>
+        </View>
 
         <View style={styles.labelsContainer}>
           <Text style={styles.labelText}>{minString}</Text>
@@ -118,6 +157,11 @@ const styles = StyleSheet.create({
   sliderContainer: {
     gap: 8,
   },
+  sliderWrapper: {
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingVertical: 6,
+  },
   valueContainer: {
     alignItems: 'center',
   },
@@ -132,7 +176,21 @@ const styles = StyleSheet.create({
   },
   slider: {
     width: '100%',
-    height: 40,
+    height: 52,
+  },
+  dragHandle: {
+    position: 'absolute',
+    top: 10,
+    width: DRAG_HANDLE_SIZE,
+    height: DRAG_HANDLE_SIZE,
+  },
+  dragHandleInner: {
+    width: DRAG_HANDLE_SIZE,
+    height: DRAG_HANDLE_SIZE,
+    borderRadius: DRAG_HANDLE_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: '0 3px 10px rgba(0,0,0,0.22)',
   },
   labelsContainer: {
     flexDirection: 'row',

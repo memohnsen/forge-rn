@@ -160,6 +160,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setSessionRPE}
           minString="Easy"
           maxString="Almost Died"
+          colorByRating
           inverseColorRating
         />
 
@@ -169,6 +170,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setMovementQuality}
           minString="Poor"
           maxString="Excellent"
+          colorByRating
         />
 
         <SliderSection
@@ -177,6 +179,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setFocus}
           minString="Distracted"
           maxString="Locked In"
+          colorByRating
         />
 
         <MultipleChoiceSection
@@ -199,6 +202,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setFeeling}
           minString="Beat Up"
           maxString="Amazing"
+          colorByRating
         />
 
         <SliderSection
@@ -207,6 +211,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setSatisfaction}
           minString="Not Satisfied"
           maxString="Very Satisfied"
+          colorByRating
         />
 
         <SliderSection
@@ -215,6 +220,7 @@ export default function WorkoutReflectionScreen() {
           onValueChange={setConfidence}
           minString="Not Confident"
           maxString="Very Confident"
+          colorByRating
         />
 
         <TextFieldSection

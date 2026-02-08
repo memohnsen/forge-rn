@@ -179,6 +179,7 @@ export default function CheckInScreen() {
           onValueChange={setPhysicalStrength}
           minString="Weak"
           maxString="Strong"
+          colorByRating
         />
 
         <SliderSection
@@ -187,6 +188,7 @@ export default function CheckInScreen() {
           onValueChange={setRecovered}
           minString="Not At All"
           maxString="Very"
+          colorByRating
         />
 
         <SliderSection
@@ -195,6 +197,7 @@ export default function CheckInScreen() {
           onValueChange={setEnergy}
           minString="Low"
           maxString="High"
+          colorByRating
         />
 
         <SliderSection
@@ -203,6 +206,7 @@ export default function CheckInScreen() {
           onValueChange={setSoreness}
           minString="None"
           maxString="Extreme"
+          colorByRating
           inverseColorRating
         />
 
@@ -212,6 +216,7 @@ export default function CheckInScreen() {
           onValueChange={setBodyConnection}
           minString="Disconnected"
           maxString="Very Connected"
+          colorByRating
         />
 
         <SliderSection
@@ -220,6 +225,7 @@ export default function CheckInScreen() {
           onValueChange={setMentalStrength}
           minString="Weak"
           maxString="Strong"
+          colorByRating
         />
 
         <SliderSection
@@ -228,6 +234,7 @@ export default function CheckInScreen() {
           onValueChange={setConfidence}
           minString="Not At All"
           maxString="Very"
+          colorByRating
         />
 
         <SliderSection
@@ -236,6 +243,7 @@ export default function CheckInScreen() {
           onValueChange={setFocus}
           minString="Distracted"
           maxString="Very Focused"
+          colorByRating
         />
 
         <SliderSection
@@ -244,6 +252,7 @@ export default function CheckInScreen() {
           onValueChange={setStress}
           minString="Extreme"
           maxString="Relaxed"
+          colorByRating
         />
 
         <SliderSection
@@ -252,6 +261,7 @@ export default function CheckInScreen() {
           onValueChange={setReadiness}
           minString="Not Ready"
           maxString="Very Ready"
+          colorByRating
         />
 
         <SliderSection
@@ -260,6 +270,7 @@ export default function CheckInScreen() {
           onValueChange={setExcitement}
           minString="Not Excited"
           maxString="Very Excited"
+          colorByRating
         />
 
         <SliderSection
@@ -268,6 +279,7 @@ export default function CheckInScreen() {
           onValueChange={setSleep}
           minString="Poor"
           maxString="Great"
+          colorByRating
         />
 
         <TextFieldSection
