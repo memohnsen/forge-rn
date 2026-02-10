@@ -2,7 +2,7 @@ module.exports = (config) => ({
   type: 'widget',
   name: 'JournalWidget',
   displayName: 'Forge',
-  bundleIdentifier: '.journalwidget',
+  bundleIdentifier: '.journalwidgetext',
   deploymentTarget: '18.0',
   frameworks: ['SwiftUI', 'WidgetKit'],
   entitlements: {

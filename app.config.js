@@ -22,6 +22,9 @@ export default {
       entitlements: {
         "com.apple.security.application-groups": [APP_GROUP],
       },
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       package: IS_DEV ? "com.memohnsen.forge.dev" : "com.memohnsen.forge",
