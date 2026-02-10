@@ -26,16 +26,9 @@ import {
 } from 'react-native';
 import Animated, {
   FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Check for iOS 26+ (iOS 26 = version 26.0)
 const isIOS26OrLater = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 26;
@@ -75,14 +68,6 @@ export default function HomeScreen() {
   const [newMeetName, setNewMeetName] = useState('');
   const [newMeetDate, setNewMeetDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const profilePressed = useSharedValue(0);
-
-  const profileAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: withSpring(interpolate(profilePressed.value, [0, 1], [1, 0.88]), { damping: 12, stiffness: 300 }) },
-    ],
-  }));
 
   useEffect(() => {
     trackScreenView('home');
@@ -187,27 +172,22 @@ export default function HomeScreen() {
             Ready to train, {firstName}?
           </Text>
         </View>
-        <AnimatedPressable
+        <Pressable
           onPress={() => {
             if (process.env.EXPO_OS === 'ios') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }
             router.push('/profile');
           }}
-          onPressIn={() => { profilePressed.value = withTiming(1, { duration: 100 }); }}
-          onPressOut={() => { profilePressed.value = withSpring(0, { damping: 12, stiffness: 300 }); }}
-          style={[
-            profileAnimatedStyle,
-            {
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-            },
-          ]}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+          }}
           accessibilityRole="button"
           accessibilityLabel="Open profile"
         >
@@ -218,7 +198,7 @@ export default function HomeScreen() {
               {profileInitial}
             </Text>
           )}
-        </AnimatedPressable>
+        </Pressable>
       </View>
     </View>
   );

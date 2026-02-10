@@ -8,14 +8,7 @@ import { formatDate } from '@/utils/dateFormatter';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
 } from 'react-native-reanimated';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface HistoryItemCardProps {
   intensity: string;
@@ -36,8 +29,6 @@ const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const pressed = useSharedValue(0);
-
   const scoreColor = (() => {
     if (score >= 80) {
       return colors.scoreGreen;
@@ -48,12 +39,6 @@ const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
     }
   })();
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: withSpring(interpolate(pressed.value, [0, 1], [1, 0.97]), { damping: 15, stiffness: 300 }) },
-    ],
-  }));
-
   const handlePress = () => {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.selectionAsync();
@@ -63,27 +48,22 @@ const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
 
   return (
     <Animated.View entering={FadeInDown.delay(300 + index * 60).duration(400).springify().damping(16)}>
-      <AnimatedPressable
+      <Pressable
         onPress={handlePress}
-        onPressIn={() => { pressed.value = withTiming(1, { duration: 100 }); }}
-        onPressOut={() => { pressed.value = withSpring(0, { damping: 15, stiffness: 300 }); }}
-        style={[
-          animatedStyle,
-          {
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 14,
-            borderRadius: 16,
-            borderCurve: 'continuous',
-            gap: 14,
-            borderWidth: 1,
-            backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-            borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-            boxShadow: isDark
-              ? '0 4px 12px rgba(0,0,0,0.2)'
-              : '0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08)',
-          },
-        ]}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 14,
+          borderRadius: 16,
+          borderCurve: 'continuous',
+          gap: 14,
+          borderWidth: 1,
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+          boxShadow: isDark
+            ? '0 4px 12px rgba(0,0,0,0.2)'
+            : '0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08)',
+        }}
       >
         <Animated.View
           style={{
@@ -112,7 +92,7 @@ const HistoryItemCard: React.FC<HistoryItemCardProps> = ({
         </Animated.View>
 
         <Ionicons name="chevron-forward" size={16} color="#666" />
-      </AnimatedPressable>
+      </Pressable>
     </Animated.View>
   );
 };

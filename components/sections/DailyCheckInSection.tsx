@@ -9,15 +9,11 @@ import Animated, {
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
   withRepeat,
   withSequence,
-  interpolate,
   Easing,
 } from 'react-native-reanimated';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface DailyCheckInSectionProps {
   streakCount: string;
@@ -38,7 +34,6 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
   const isDark = colorScheme === 'dark';
   const router = useRouter();
 
-  const buttonPressed = useSharedValue(0);
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -56,12 +51,6 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
-  }));
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: withSpring(interpolate(buttonPressed.value, [0, 1], [1, 0.95]), { damping: 15, stiffness: 350 }) },
-    ],
   }));
 
   const handleButtonPress = () => {
@@ -141,11 +130,8 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
             training.
           </Animated.Text>
 
-          <AnimatedPressable
+          <Pressable
             onPress={handleButtonPress}
-            onPressIn={() => { buttonPressed.value = withTiming(1, { duration: 100 }); }}
-            onPressOut={() => { buttonPressed.value = withSpring(0, { damping: 15, stiffness: 350 }); }}
-            style={buttonAnimatedStyle}
           >
             <LinearGradient
               colors={[colors.checkInOrange, `${colors.checkInOrange}D9`]}
@@ -166,7 +152,7 @@ export const DailyCheckInSection: React.FC<DailyCheckInSectionProps> = ({
               </Animated.Text>
               <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
             </LinearGradient>
-          </AnimatedPressable>
+          </Pressable>
         </Animated.View>
       </Animated.View>
     </Animated.View>
