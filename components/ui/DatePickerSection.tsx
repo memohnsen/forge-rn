@@ -9,15 +9,18 @@ interface DatePickerSectionProps {
   title: string;
   value: Date;
   onChange: (date: Date) => void;
+  accentColor?: string;
 }
 
 export const DatePickerSection: React.FC<DatePickerSectionProps> = ({
   title,
   value,
   onChange,
+  accentColor,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const accent = accentColor ?? colors.blueEnergy;
   const [showPicker, setShowPicker] = useState(false);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -42,21 +45,21 @@ export const DatePickerSection: React.FC<DatePickerSectionProps> = ({
         styles.container,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+          borderColor: isDark ? `${accent}33` : `${accent}20`,
           boxShadow: isDark
-            ? `0 4px 12px ${colors.blueEnergy}20`
-            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
+            ? `0 4px 12px ${accent}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accent}30`,
         },
       ]}
     >
       <View style={styles.header}>
         <LinearGradient
-          colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
+          colors={[`${accent}40`, `${accent}1A`]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.iconCircle}
         >
-          <Ionicons name="calendar" size={18} color={colors.blueEnergy} />
+          <Ionicons name="calendar" size={18} color={accent} />
         </LinearGradient>
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
       </View>
@@ -68,7 +71,7 @@ export const DatePickerSection: React.FC<DatePickerSectionProps> = ({
           display="compact"
           onChange={handleDateChange}
           style={styles.iosPicker}
-          accentColor={colors.blueEnergy}
+          accentColor={accent}
         />
       ) : (
         <>

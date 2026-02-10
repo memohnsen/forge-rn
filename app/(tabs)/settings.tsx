@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -184,6 +185,27 @@ export default function SettingsScreen() {
           isDanger
           onPress={handleDelete}
         />
+
+        {__DEV__ && (
+          <>
+            <View style={styles.dangerHeader}>
+              <View style={[styles.dangerDot, { backgroundColor: colors.blueEnergy }]} />
+              <Text style={styles.dangerText}>DEV TOOLS</Text>
+            </View>
+            <SettingsRow
+              icon="restart"
+              title="Replay Onboarding"
+              accentColor={colors.blueEnergy}
+              isDark={isDark}
+              onPress={async () => {
+                if (!userId) return;
+                await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
+                await SecureStore.deleteItemAsync(`hasSeenOnboarding_${userId}`);
+                router.replace('/(onboarding)');
+              }}
+            />
+          </>
+        )}
 
         <View style={styles.footerLinks}>
           <View style={styles.linksRow}>

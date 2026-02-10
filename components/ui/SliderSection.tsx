@@ -17,6 +17,7 @@ interface SliderSectionProps {
   maxValue?: number;
   inverseColorRating?: boolean;
   colorByRating?: boolean;
+  accentColor?: string;
 }
 
 export const SliderSection: React.FC<SliderSectionProps> = ({
@@ -29,11 +30,13 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
   maxValue = 5,
   inverseColorRating = false,
   colorByRating = false,
+  accentColor,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const showCustomHandle = Platform.OS !== 'ios';
   const [sliderWidth, setSliderWidth] = React.useState(0);
+  const accent = accentColor ?? colors.blueEnergy;
 
   const range = Math.max(maxValue - minValue, 1);
   const normalizedValue = Math.min(Math.max((value - minValue) / range, 0), 1);
@@ -44,8 +47,8 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
       ? colors.scoreRed
       : normalizedRating >= 0.6
         ? colors.scoreGreen
-        : colors.blueEnergy
-    : colors.blueEnergy;
+        : accent
+    : accent;
   const dragHandleX = sliderWidth * normalizedValue;
 
   return (
@@ -54,21 +57,21 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
         styles.container,
         {
           backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-          borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+          borderColor: isDark ? `${accent}33` : `${accent}20`,
           boxShadow: isDark
-            ? `0 4px 12px ${colors.blueEnergy}20`
-            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
+            ? `0 4px 12px ${accent}20`
+            : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accent}30`,
         },
       ]}
     >
       <View style={styles.header}>
         <LinearGradient
-          colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
+          colors={[`${accent}40`, `${accent}1A`]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.iconCircle}
         >
-          <Ionicons name="analytics" size={18} color={colors.blueEnergy} />
+          <Ionicons name="analytics" size={18} color={accent} />
         </LinearGradient>
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
       </View>

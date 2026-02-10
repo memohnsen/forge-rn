@@ -57,7 +57,7 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [data, setData] = useState<OnboardingData>(initialData);
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = 9;
+  const totalPages = 17;
 
   const updateData = useCallback((updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }));

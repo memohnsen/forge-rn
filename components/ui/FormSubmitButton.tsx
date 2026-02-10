@@ -1,8 +1,15 @@
-import { colors } from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors } from "@/constants/colors";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import React from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from "react-native";
 
 interface FormSubmitButtonProps {
   title: string;
@@ -22,11 +29,16 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
   onPress,
 }) => {
   const disabled = !isEnabled || isLoading;
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
     <View style={styles.container}>
       <Pressable
-        style={({ pressed }) => [styles.button, pressed && !disabled && styles.pressed]}
+        style={({ pressed }) => [
+          styles.button,
+          pressed && !disabled && styles.pressed,
+        ]}
         onPress={onPress}
         disabled={disabled}
       >
@@ -34,7 +46,7 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
           colors={
             isEnabled
               ? [accentColor, `${accentColor}D9`]
-              : ['#80808080', '#80808066']
+              : ["#80808080", "#80808066"]
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
@@ -49,8 +61,16 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name={icon} size={18} color="#FFFFFF" />
-              <Text style={styles.text}>{title}</Text>
+              <Ionicons
+                name={icon}
+                size={18}
+                color={isDark ? "#000000" : "#FFFFFF"}
+              />
+              <Text
+                style={[styles.text, { color: isDark ? "#000000" : "#FFFFFF" }]}
+              >
+                {title}
+              </Text>
             </>
           )}
         </LinearGradient>
@@ -67,22 +87,21 @@ const styles = StyleSheet.create({
   },
   button: {
     borderRadius: 14,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   pressed: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
   gradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
     paddingVertical: 16,
   },
   text: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
   },
 });

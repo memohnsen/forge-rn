@@ -1,7 +1,8 @@
 import { OnboardingHeroPage } from '@/components/onboarding/OnboardingHeroPage';
+import { OnboardingQuestionPage } from '@/components/onboarding/OnboardingQuestionPage';
 import { DatePickerSection } from '@/components/ui/DatePickerSection';
 import { FormSubmitButton } from '@/components/ui/FormSubmitButton';
-import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
+import { OnboardingSelectList } from '@/components/onboarding/OnboardingSelectList';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
@@ -17,16 +18,11 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
-  KeyboardAvoidingView,
-  NativeSyntheticEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TextInputFocusEventData,
   useColorScheme,
   View,
 } from 'react-native';
@@ -39,8 +35,6 @@ import {
   trackOnboardingStarted,
   trackScreenView,
 } from '@/utils/analytics';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Hero page data for pages 1-4
 const heroPages = [
@@ -140,14 +134,14 @@ export default function OnboardingScreen() {
 
   const { data, currentPage, updateData, nextPage, prevPage, totalPages } = useOnboarding();
 
+  // Monochrome accent for question pages (matches OnboardingQuestionPage style)
+  const monoAccent = isDark ? '#FFFFFF' : '#000000';
+
   const [isLoading, setIsLoading] = useState(false);
   const [setupProgress, setSetupProgress] = useState(0);
   const [selectedDayForTime, setSelectedDayForTime] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasTrackedStart = useRef(false);
-
-  // Refs for ScrollViews to reset scroll position
-  const scrollViewRef = useRef<ScrollView>(null);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -158,10 +152,8 @@ export default function OnboardingScreen() {
   // Setup animation for final page
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // Reset scroll position when page changes
-  useEffect(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-  }, [currentPage]);
+  // Total question pages (pages 5-16) for progress bar
+  const totalQuestionSteps = 12;
 
   useEffect(() => {
     if (!hasTrackedStart.current) {
@@ -176,7 +168,7 @@ export default function OnboardingScreen() {
   }, [currentPage, totalPages]);
 
   useEffect(() => {
-    if (currentPage === 9) {
+    if (currentPage === 17) {
       Animated.timing(progressAnim, {
         toValue: 100,
         duration: 2500,
@@ -196,32 +188,6 @@ export default function OnboardingScreen() {
       return () => clearInterval(interval);
     }
   }, [currentPage]);
-
-  // Validation for each section
-  const isPainPointValid =
-    data.currentTrackingMethod.length > 0 &&
-    data.biggestFrustration.length > 0 &&
-    data.reflectionFrequency.length > 0 &&
-    data.whatHoldingBack.length > 0;
-
-  const isUserInfoValid =
-    data.firstName.length > 0 && data.lastName.length > 0 && data.sport.length > 0;
-
-  const isSportingInfoValid =
-    data.goal.length > 0 && data.biggestStruggle.length > 0 && data.nextComp.length > 0;
-
-  const isTrainingDaysValid = Object.keys(data.trainingDays).length > 0;
-
-  const handleInputFocus = React.useCallback(
-    (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
-      const target = event.nativeEvent.target;
-      if (!target) return;
-      setTimeout(() => {
-        (scrollViewRef.current as any)?.scrollResponderScrollNativeHandleToKeyboard(target, 100, true);
-      }, 60);
-    },
-    []
-  );
 
   const handleCompleteOnboarding = async () => {
     // Guard against re-entrancy from rapid taps
@@ -377,253 +343,287 @@ export default function OnboardingScreen() {
     );
   }
 
-  // Render pain point discovery (page 5)
+  // Page 5: How do you work through mental blocks?
   if (currentPage === 5) {
     return (
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        enabled={Platform.OS === 'android'}
-        behavior={Platform.OS === 'android' ? 'height' : undefined}
-        keyboardVerticalOffset={0}
+      <OnboardingQuestionPage
+        title="How do you currently work through mental blocks?"
+        currentStep={1}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.currentTrackingMethod.length > 0}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        >
-          <SectionHeader
-            title="Understanding You"
-            subtitle="These questions help personalize your experience"
-            isDark={isDark}
-          />
-
-          <MultipleChoiceSection
-            title="How do you currently work through mental blocks?"
-            options={trackingMethodOptions}
-            selected={data.currentTrackingMethod}
-            onSelect={(value) => updateData({ currentTrackingMethod: value })}
-          />
-
-          <TextFieldSection
-            title="What's been your biggest frustration with training lately?"
-            value={data.biggestFrustration}
-            onChangeText={(text) => updateData({ biggestFrustration: text })}
-            onFocus={handleInputFocus}
-            placeholder="Enter your frustration..."
-          />
-
-          <MultipleChoiceSection
-            title="How often do you reflect on your training sessions?"
-            options={reflectionFrequencyOptions}
-            selected={data.reflectionFrequency}
-            onSelect={(value) => updateData({ reflectionFrequency: value })}
-          />
-
-          <TextFieldSection
-            title="What do you think is holding you back from your best performance?"
-            value={data.whatHoldingBack}
-            onChangeText={(text) => updateData({ whatHoldingBack: text })}
-            onFocus={handleInputFocus}
-            placeholder="Enter your barrier..."
-          />
-
-          <FormSubmitButton
-            title="Continue"
-            icon="arrow-forward"
-            isLoading={false}
-            isEnabled={isPainPointValid}
-            accentColor={colors.blueEnergy}
-            onPress={nextPage}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <OnboardingSelectList
+          options={trackingMethodOptions}
+          selected={data.currentTrackingMethod}
+          onSelect={(value) => updateData({ currentTrackingMethod: value })}
+        />
+      </OnboardingQuestionPage>
     );
   }
 
-  // Render user info (page 6)
+  // Page 6: Biggest frustration
   if (currentPage === 6) {
     return (
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        enabled={Platform.OS === 'android'}
-        behavior={Platform.OS === 'android' ? 'height' : undefined}
-        keyboardVerticalOffset={0}
+      <OnboardingQuestionPage
+        title="What's been your biggest frustration with training lately?"
+        currentStep={2}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.biggestFrustration.length > 0}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        >
-          <SectionHeader title="Building Your Profile" isDark={isDark} />
-
-          <InputCard isDark={isDark} title="First Name" icon="person">
-            <TextInput
-              style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
-              value={data.firstName}
-              onChangeText={(text) => updateData({ firstName: text })}
-              onFocus={handleInputFocus}
-              placeholder="First Name"
-              placeholderTextColor="#999"
-            />
-          </InputCard>
-
-          <InputCard isDark={isDark} title="Last Name" icon="person">
-            <TextInput
-              style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
-              value={data.lastName}
-              onChangeText={(text) => updateData({ lastName: text })}
-              onFocus={handleInputFocus}
-              placeholder="Last Name"
-              placeholderTextColor="#999"
-            />
-          </InputCard>
-
-          <MultipleChoiceSection
-            title="What sport do you compete in?"
-            options={sportOptions}
-            selected={data.sport}
-            onSelect={(value) => updateData({ sport: value })}
-          />
-
-          <SliderSection
-            title="Years of Experience"
-            value={data.yearsExperience}
-            onValueChange={(value) => updateData({ yearsExperience: value })}
-            minString="0"
-            maxString="10+"
-            minValue={0}
-            maxValue={10}
-          />
-
-          <SliderSection
-            title="Meets Per Year"
-            value={data.meetsPerYear}
-            onValueChange={(value) => updateData({ meetsPerYear: value })}
-            minString="0"
-            maxString="10+"
-            minValue={0}
-            maxValue={10}
-          />
-
-          <FormSubmitButton
-            title="Continue"
-            icon="arrow-forward"
-            isLoading={false}
-            isEnabled={isUserInfoValid}
-            accentColor={colors.blueEnergy}
-            onPress={nextPage}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <TextFieldSection
+          title="Your frustration"
+          value={data.biggestFrustration}
+          onChangeText={(text) => updateData({ biggestFrustration: text })}
+          placeholder="Enter your frustration..."
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
     );
   }
 
-  // Render sporting info (page 7)
+  // Page 7: Reflection frequency
   if (currentPage === 7) {
     return (
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        enabled={Platform.OS === 'android'}
-        behavior={Platform.OS === 'android' ? 'height' : undefined}
-        keyboardVerticalOffset={0}
+      <OnboardingQuestionPage
+        title="How often do you reflect on your training sessions?"
+        currentStep={3}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.reflectionFrequency.length > 0}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        >
-          <SectionHeader title="Building Your Profile" isDark={isDark} />
-
-          <TextFieldSection
-            title="What's your next 6-12 month goal?"
-            value={data.goal}
-            onChangeText={(text) => updateData({ goal: text })}
-            onFocus={handleInputFocus}
-            placeholder="Enter your goal..."
-          />
-
-          <MultipleChoiceSection
-            title={`What is the hardest part of ${data.sport === 'Olympic Weightlifting' ? 'Weightlifting' : 'Powerlifting'} mentally for you?`}
-            options={struggleOptions}
-            selected={data.biggestStruggle}
-            onSelect={(value) => updateData({ biggestStruggle: value })}
-          />
-
-          <TextFieldSection
-            title="What's your next meet?"
-            value={data.nextComp}
-            onChangeText={(text) => updateData({ nextComp: text })}
-            onFocus={handleInputFocus}
-            placeholder="Enter meet name..."
-            multiline={false}
-          />
-
-          <DatePickerSection
-            title="Next meet date?"
-            value={data.nextCompDate}
-            onChange={(date) => updateData({ nextCompDate: date })}
-          />
-
-          <FormSubmitButton
-            title="Continue"
-            icon="arrow-forward"
-            isLoading={false}
-            isEnabled={isSportingInfoValid}
-            accentColor={colors.blueEnergy}
-            onPress={nextPage}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <OnboardingSelectList
+          options={reflectionFrequencyOptions}
+          selected={data.reflectionFrequency}
+          onSelect={(value) => updateData({ reflectionFrequency: value })}
+        />
+      </OnboardingQuestionPage>
     );
   }
 
-  // Render training days (page 8)
+  // Page 8: What's holding you back
   if (currentPage === 8) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <SectionHeader title="Building Your Profile" isDark={isDark} />
+      <OnboardingQuestionPage
+        title="What do you think is holding you back from your best performance?"
+        currentStep={4}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.whatHoldingBack.length > 0}
+      >
+        <TextFieldSection
+          title="Your barrier"
+          value={data.whatHoldingBack}
+          onChangeText={(text) => updateData({ whatHoldingBack: text })}
+          placeholder="Enter your barrier..."
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
 
+  // Page 9: First + Last Name
+  if (currentPage === 9) {
+    return (
+      <OnboardingQuestionPage
+        title="What's your name?"
+        currentStep={5}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.firstName.length > 0 && data.lastName.length > 0}
+      >
+        <InputCard isDark={isDark} title="First Name" icon="person">
+          <TextInput
+            style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
+            value={data.firstName}
+            onChangeText={(text) => updateData({ firstName: text })}
+            placeholder="First Name"
+            placeholderTextColor="#999"
+          />
+        </InputCard>
+
+        <InputCard isDark={isDark} title="Last Name" icon="person">
+          <TextInput
+            style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
+            value={data.lastName}
+            onChangeText={(text) => updateData({ lastName: text })}
+            placeholder="Last Name"
+            placeholderTextColor="#999"
+          />
+        </InputCard>
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 10: Sport
+  if (currentPage === 10) {
+    return (
+      <OnboardingQuestionPage
+        title="What sport do you compete in?"
+        currentStep={6}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.sport.length > 0}
+      >
+        <OnboardingSelectList
+          options={sportOptions}
+          selected={data.sport}
+          onSelect={(value) => updateData({ sport: value })}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 11: Years of Experience
+  if (currentPage === 11) {
+    return (
+      <OnboardingQuestionPage
+        title="How many years of experience do you have?"
+        currentStep={7}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={true}
+      >
+        <SliderSection
+          title="Years of Experience"
+          value={data.yearsExperience}
+          onValueChange={(value) => updateData({ yearsExperience: value })}
+          minString="0"
+          maxString="10+"
+          minValue={0}
+          maxValue={10}
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 12: Meets Per Year
+  if (currentPage === 12) {
+    return (
+      <OnboardingQuestionPage
+        title="How many meets do you do per year?"
+        currentStep={8}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={true}
+      >
+        <SliderSection
+          title="Meets Per Year"
+          value={data.meetsPerYear}
+          onValueChange={(value) => updateData({ meetsPerYear: value })}
+          minString="0"
+          maxString="10+"
+          minValue={0}
+          maxValue={10}
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 13: Next 6-12 month goal
+  if (currentPage === 13) {
+    return (
+      <OnboardingQuestionPage
+        title="What's your next 6-12 month goal?"
+        currentStep={9}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.goal.length > 0}
+      >
+        <TextFieldSection
+          title="Your goal"
+          value={data.goal}
+          onChangeText={(text) => updateData({ goal: text })}
+          placeholder="Enter your goal..."
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 14: Biggest mental struggle
+  if (currentPage === 14) {
+    return (
+      <OnboardingQuestionPage
+        title={`What is the hardest part of ${data.sport === 'Olympic Weightlifting' ? 'Weightlifting' : 'Powerlifting'} mentally for you?`}
+        currentStep={10}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.biggestStruggle.length > 0}
+      >
+        <OnboardingSelectList
+          options={struggleOptions}
+          selected={data.biggestStruggle}
+          onSelect={(value) => updateData({ biggestStruggle: value })}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 15: Next meet name + date (grouped)
+  if (currentPage === 15) {
+    return (
+      <OnboardingQuestionPage
+        title="What's your next meet?"
+        currentStep={11}
+        totalSteps={totalQuestionSteps}
+        onNext={nextPage}
+        onBack={prevPage}
+        isValid={data.nextComp.length > 0}
+      >
+        <TextFieldSection
+          title="Meet name"
+          value={data.nextComp}
+          onChangeText={(text) => updateData({ nextComp: text })}
+          placeholder="Enter meet name..."
+          multiline={false}
+          accentColor={monoAccent}
+        />
+
+        <DatePickerSection
+          title="Meet date"
+          value={data.nextCompDate}
+          onChange={(date) => updateData({ nextCompDate: date })}
+          accentColor={monoAccent}
+        />
+      </OnboardingQuestionPage>
+    );
+  }
+
+  // Page 16: Training days
+  if (currentPage === 16) {
+    return (
+      <>
+        <OnboardingQuestionPage
+          title="When do you train?"
+          currentStep={12}
+          totalSteps={totalQuestionSteps}
+          onNext={nextPage}
+          onBack={prevPage}
+          isValid={Object.keys(data.trainingDays).length > 0}
+        >
           <View
             style={[
               styles.trainingCard,
               {
                 backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-                borderColor: `${colors.blueEnergy}33`,
+                borderColor: isDark ? '#2A2A2A' : '#E8E8E8',
               },
             ]}
           >
-            <View style={styles.header}>
-              <LinearGradient
-                colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.iconCircle}
-              >
-                <Ionicons name="calendar" size={18} color={colors.blueEnergy} />
-              </LinearGradient>
-              <Text style={[styles.cardTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-                When do you train?
-              </Text>
-            </View>
-
             <View style={styles.daysList}>
               {weekDays.map((day) => {
                 const isSelected = !!data.trainingDays[day];
@@ -634,11 +634,13 @@ export default function OnboardingScreen() {
                         styles.dayButton,
                         {
                           backgroundColor: isSelected
-                            ? colors.blueEnergy
+                            ? isDark ? '#FFFFFF' : '#000000'
                             : isDark
-                              ? 'rgba(83, 134, 228, 0.15)'
-                              : 'rgba(83, 134, 228, 0.12)',
-                          borderColor: isSelected ? 'transparent' : 'rgba(83, 134, 228, 0.3)',
+                              ? 'rgba(255, 255, 255, 0.08)'
+                              : 'rgba(0, 0, 0, 0.05)',
+                          borderColor: isSelected
+                            ? 'transparent'
+                            : isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
                         },
                       ]}
                       onPress={() => toggleTrainingDay(day)}
@@ -646,7 +648,11 @@ export default function OnboardingScreen() {
                       <Text
                         style={[
                           styles.dayText,
-                          { color: isSelected ? '#FFFFFF' : colors.blueEnergy },
+                          {
+                            color: isSelected
+                              ? isDark ? '#000000' : '#FFFFFF'
+                              : isDark ? '#FFFFFF' : '#000000',
+                          },
                         ]}
                       >
                         {day}
@@ -659,14 +665,18 @@ export default function OnboardingScreen() {
                           styles.timeButton,
                           {
                             backgroundColor: isDark
-                              ? 'rgba(83, 134, 228, 0.15)'
-                              : 'rgba(83, 134, 228, 0.12)',
-                            borderColor: 'rgba(83, 134, 228, 0.3)',
+                              ? 'rgba(255, 255, 255, 0.08)'
+                              : 'rgba(0, 0, 0, 0.05)',
+                            borderColor: isDark
+                              ? 'rgba(255, 255, 255, 0.15)'
+                              : 'rgba(0, 0, 0, 0.12)',
                           },
                         ]}
                         onPress={() => setSelectedDayForTime(day)}
                       >
-                        <Text style={styles.timeButtonText}>{data.trainingDays[day]}</Text>
+                        <Text style={[styles.timeButtonText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+                          {data.trainingDays[day]}
+                        </Text>
                       </Pressable>
                     ) : (
                       <View style={styles.timePlaceholder}>
@@ -678,16 +688,7 @@ export default function OnboardingScreen() {
               })}
             </View>
           </View>
-
-          <FormSubmitButton
-            title="Continue"
-            icon="arrow-forward"
-            isLoading={false}
-            isEnabled={isTrainingDaysValid}
-            accentColor={colors.blueEnergy}
-            onPress={nextPage}
-          />
-        </ScrollView>
+        </OnboardingQuestionPage>
 
         {/* Time Picker Modal */}
         {selectedDayForTime && (
@@ -716,7 +717,7 @@ export default function OnboardingScreen() {
                       {
                         backgroundColor:
                           data.trainingDays[selectedDayForTime] === time
-                            ? `${colors.blueEnergy}1F`
+                            ? isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)'
                             : 'transparent',
                       },
                     ]}
@@ -726,12 +727,7 @@ export default function OnboardingScreen() {
                       style={[
                         styles.timeOptionText,
                         {
-                          color:
-                            data.trainingDays[selectedDayForTime] === time
-                              ? colors.blueEnergy
-                              : isDark
-                                ? '#FFFFFF'
-                                : '#000000',
+                          color: isDark ? '#FFFFFF' : '#000000',
                           fontWeight:
                             data.trainingDays[selectedDayForTime] === time ? '600' : '400',
                         },
@@ -740,7 +736,7 @@ export default function OnboardingScreen() {
                       {time}
                     </Text>
                     {data.trainingDays[selectedDayForTime] === time && (
-                      <Ionicons name="checkmark-circle" size={22} color={colors.blueEnergy} />
+                      <Ionicons name="checkmark-circle" size={22} color={isDark ? '#FFFFFF' : '#000000'} />
                     )}
                   </Pressable>
                 ))}
@@ -748,12 +744,12 @@ export default function OnboardingScreen() {
             </View>
           </View>
         )}
-      </View>
+      </>
     );
   }
 
-  // Render setup/customizing (page 9)
-  if (currentPage === 9) {
+  // Render setup/customizing (page 17)
+  if (currentPage === 17) {
     return (
       <View
         style={[
@@ -845,75 +841,39 @@ export default function OnboardingScreen() {
 }
 
 // Helper Components
-const SectionHeader: React.FC<{ title: string; subtitle?: string; isDark: boolean }> = ({
-  title,
-  subtitle,
-  isDark,
-}) => (
-  <View style={styles.sectionHeader}>
-    <Text style={[styles.sectionTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
-    {subtitle && (
-      <Text style={[styles.sectionSubtitle, { color: isDark ? '#AAAAAA' : '#666666' }]}>
-        {subtitle}
-      </Text>
-    )}
-  </View>
-);
-
 const InputCard: React.FC<{
   isDark: boolean;
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   children: React.ReactNode;
-}> = ({ isDark, title, icon, children }) => (
-  <View
-    style={[
-      styles.inputCard,
-      {
-        backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-        borderColor: `${colors.blueEnergy}33`,
-      },
-    ]}
-  >
-    <View style={styles.header}>
-      <LinearGradient
-        colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.iconCircle}
-      >
-        <Ionicons name={icon} size={18} color={colors.blueEnergy} />
-      </LinearGradient>
-      <Text style={[styles.cardTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
+}> = ({ isDark, title, icon, children }) => {
+  const accent = isDark ? '#FFFFFF' : '#000000';
+  return (
+    <View
+      style={[
+        styles.inputCard,
+        {
+          backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+          borderColor: isDark ? '#2A2A2A' : '#E8E8E8',
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={[styles.iconCircle, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
+          <Ionicons name={icon} size={18} color={accent} />
+        </View>
+        <Text style={[styles.cardTitle, { color: accent }]}>{title}</Text>
+      </View>
+      <View style={[styles.inputWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+        {children}
+      </View>
     </View>
-    <View style={[styles.inputWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-      {children}
-    </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 30,
-  },
-  sectionHeader: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  sectionSubtitle: {
-    fontSize: 16,
-    lineHeight: 22,
   },
   inputCard: {
     marginHorizontal: 16,
@@ -995,7 +955,6 @@ const styles = StyleSheet.create({
   timeButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: colors.blueEnergy,
   },
   timePlaceholder: {
     flex: 1,
