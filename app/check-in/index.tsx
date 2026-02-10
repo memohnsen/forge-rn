@@ -8,9 +8,10 @@ import { formatToISO } from '@/utils/dateFormatter';
 import { createClerkSupabaseClient } from '@/services/supabase';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
@@ -35,8 +36,11 @@ export default function CheckInScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
   const { getToken, userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const isEditMode = Boolean(editId);
+  const editItemId = Number(editId ?? 0);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -68,11 +72,68 @@ export default function CheckInScreen() {
 
   const [concerns, setConcerns] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
     trackScreenView('check_in');
     trackCheckInStarted();
   }, []);
+
+  React.useEffect(() => {
+    const hydrateEditState = async () => {
+      if (!isEditMode) {
+        setIsHydratingEditState(false);
+        return;
+      }
+      if (hasHydratedEditStateRef.current) return;
+      if (!userId || !editItemId) return;
+
+      hasHydratedEditStateRef.current = true;
+      setIsHydratingEditState(true);
+      try {
+        const { data, error } = await supabase
+          .from('journal_daily_checkins')
+          .select('*')
+          .eq('id', editItemId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+          Alert.alert('Entry not found', 'Unable to load this check-in.');
+          router.back();
+          return;
+        }
+
+        setSessionDate(new Date(data.check_in_date));
+        setSelectedLift(data.selected_lift ?? 'Squat');
+        setSelectedIntensity(data.selected_intensity ?? 'Moderate');
+        setGoal(data.goal ?? '');
+        setPhysicalStrength(data.physical_strength ?? 3);
+        setMentalStrength(data.mental_strength ?? 3);
+        setRecovered(data.recovered ?? 3);
+        setConfidence(data.confidence ?? 3);
+        setSleep(data.sleep ?? 3);
+        setEnergy(data.energy ?? 3);
+        setStress(data.stress ?? 3);
+        setSoreness(data.soreness ?? 3);
+        setReadiness(data.readiness ?? 3);
+        setFocus(data.focus ?? 3);
+        setExcitement(data.excitement ?? 3);
+        setBodyConnection(data.body_connection ?? 3);
+        setConcerns(data.concerns ?? '');
+      } catch (err) {
+        console.error('Error loading check-in for edit:', err);
+        Alert.alert('Unable to load entry', 'Please try again.');
+        router.back();
+      } finally {
+        setIsHydratingEditState(false);
+      }
+    };
+
+    hydrateEditState();
+  }, [editItemId, isEditMode, router, supabase, userId]);
 
   // Calculate scores
   const physicalScore = Math.round(
@@ -104,8 +165,7 @@ export default function CheckInScreen() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('journal_daily_checkins').insert({
-        user_id: userId,
+      const payload = {
         check_in_date: formatToISO(sessionDate),
         selected_lift: selectedLift,
         selected_intensity: selectedIntensity,
@@ -126,28 +186,56 @@ export default function CheckInScreen() {
         physical_score: physicalScore,
         mental_score: mentalScore,
         overall_score: overallScore,
-        created_at: new Date().toISOString(),
-      });
+      };
+
+      const { error } = isEditMode
+        ? await supabase
+            .from('journal_daily_checkins')
+            .update(payload)
+            .eq('id', editItemId)
+            .eq('user_id', userId)
+        : await supabase.from('journal_daily_checkins').insert({
+            ...payload,
+            user_id: userId,
+            created_at: new Date().toISOString(),
+          });
 
       if (error) {
         throw error;
       }
 
       trackCheckInSubmitted(selectedLift, selectedIntensity, overallScore);
-
-      router.push({
-        pathname: '/check-in/confirmation',
-        params: {
-          overallScore: overallScore.toString(),
-          physicalScore: physicalScore.toString(),
-          mentalScore: mentalScore.toString(),
-          selectedLift,
-          selectedIntensity,
-        },
-      });
+      if (isEditMode) {
+        Alert.alert('Saved', 'Your check-in has been updated.', [
+          {
+            text: 'OK',
+            onPress: () =>
+              router.replace({
+                pathname: '/history/[id]',
+                params: { id: String(editItemId), type: 'Check-Ins' },
+              }),
+          },
+        ]);
+      } else {
+        router.push({
+          pathname: '/check-in/confirmation',
+          params: {
+            overallScore: overallScore.toString(),
+            physicalScore: physicalScore.toString(),
+            mentalScore: mentalScore.toString(),
+            selectedLift,
+            selectedIntensity,
+          },
+        });
+      }
     } catch (err) {
       console.error('Error submitting check-in:', err);
-      Alert.alert('Submission failed', 'Unable to save your check-in. Please try again.');
+      Alert.alert(
+        isEditMode ? 'Update failed' : 'Submission failed',
+        isEditMode
+          ? 'Unable to update your check-in. Please try again.'
+          : 'Unable to save your check-in. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -166,10 +254,16 @@ export default function CheckInScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-            Daily Check-In
+            {isEditMode ? 'Edit Check-In' : 'Daily Check-In'}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
+
+        {isHydratingEditState ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.blueEnergy} />
+          </View>
+        ) : (
 
         <ScrollView
           ref={scrollViewRef}
@@ -321,13 +415,14 @@ export default function CheckInScreen() {
         />
 
           <FormSubmitButton
-            title="Submit Check-In"
+            title={isEditMode ? 'Save Changes' : 'Submit Check-In'}
             icon="checkmark-circle"
             isLoading={isLoading}
             isEnabled={hasCompletedForm}
             onPress={handleSubmit}
           />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -361,5 +456,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 8,
     paddingBottom: 40,
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

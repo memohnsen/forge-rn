@@ -8,9 +8,10 @@ import { createClerkSupabaseClient } from '@/services/supabase';
 import { formatToISO } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
@@ -41,8 +42,11 @@ export default function WorkoutReflectionScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
   const { getToken, userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const isEditMode = Boolean(editId);
+  const editItemId = Number(editId ?? 0);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -71,11 +75,65 @@ export default function WorkoutReflectionScreen() {
   const [whatWouldChange, setWhatWouldChange] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
     trackScreenView('session_reflection');
     trackSessionReflectionStarted();
   }, []);
+
+  React.useEffect(() => {
+    const hydrateEditState = async () => {
+      if (!isEditMode) {
+        setIsHydratingEditState(false);
+        return;
+      }
+      if (hasHydratedEditStateRef.current) return;
+      if (!userId || !editItemId) return;
+
+      hasHydratedEditStateRef.current = true;
+      setIsHydratingEditState(true);
+      try {
+        const { data, error } = await supabase
+          .from('journal_session_report')
+          .select('*')
+          .eq('id', editItemId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+          Alert.alert('Entry not found', 'Unable to load this reflection.');
+          router.back();
+          return;
+        }
+
+        setSessionDate(new Date(data.session_date));
+        setTimeOfDay(data.time_of_day ?? 'Late Morning');
+        setSelectedLift(data.selected_lift ?? 'Squat');
+        setSelectedIntensity(data.selected_intensity ?? 'Moderate');
+        setSessionRPE(data.session_rpe ?? 3);
+        setMovementQuality(data.movement_quality ?? 3);
+        setFocus(data.focus ?? 3);
+        setMisses(data.misses ?? '0');
+        setCues(data.cues ?? '');
+        setFeeling(data.feeling ?? 3);
+        setSatisfaction(data.satisfaction ?? 3);
+        setConfidence(data.confidence ?? 3);
+        setWhatLearned(data.what_learned ?? '');
+        setWhatWouldChange(data.what_would_change ?? '');
+      } catch (err) {
+        console.error('Error loading session reflection for edit:', err);
+        Alert.alert('Unable to load entry', 'Please try again.');
+        router.back();
+      } finally {
+        setIsHydratingEditState(false);
+      }
+    };
+
+    hydrateEditState();
+  }, [editItemId, isEditMode, router, supabase, userId]);
 
   const hasCompletedForm = cues.length > 0;
 
@@ -98,8 +156,7 @@ export default function WorkoutReflectionScreen() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('journal_session_report').insert({
-        user_id: userId,
+      const payload = {
         session_date: formatToISO(sessionDate),
         time_of_day: timeOfDay,
         session_rpe: sessionRPE,
@@ -114,21 +171,49 @@ export default function WorkoutReflectionScreen() {
         what_would_change: whatWouldChange,
         selected_lift: selectedLift,
         selected_intensity: selectedIntensity,
-        created_at: new Date().toISOString(),
-      });
+      };
+
+      const { error } = isEditMode
+        ? await supabase
+            .from('journal_session_report')
+            .update(payload)
+            .eq('id', editItemId)
+            .eq('user_id', userId)
+        : await supabase.from('journal_session_report').insert({
+            ...payload,
+            user_id: userId,
+            created_at: new Date().toISOString(),
+          });
 
       if (error) {
         throw error;
       }
 
       trackSessionReflectionSubmitted(selectedLift, selectedIntensity, sessionRPE);
-
-      Alert.alert('Success!', 'Your session reflection has been submitted.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (isEditMode) {
+        Alert.alert('Saved', 'Your session reflection has been updated.', [
+          {
+            text: 'OK',
+            onPress: () =>
+              router.replace({
+                pathname: '/history/[id]',
+                params: { id: String(editItemId), type: 'Workouts' },
+              }),
+          },
+        ]);
+      } else {
+        Alert.alert('Success!', 'Your session reflection has been submitted.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (err) {
       console.error('Error submitting session report:', err);
-      Alert.alert('Submission failed', 'Unable to save your session reflection. Please try again.');
+      Alert.alert(
+        isEditMode ? 'Update failed' : 'Submission failed',
+        isEditMode
+          ? 'Unable to update your session reflection. Please try again.'
+          : 'Unable to save your session reflection. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -147,10 +232,16 @@ export default function WorkoutReflectionScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-            Session Reflection
+            {isEditMode ? 'Edit Session Reflection' : 'Session Reflection'}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
+
+        {isHydratingEditState ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.blueEnergy} />
+          </View>
+        ) : (
 
         <ScrollView
           ref={scrollViewRef}
@@ -270,13 +361,14 @@ export default function WorkoutReflectionScreen() {
         />
 
           <FormSubmitButton
-            title="Submit Session Review"
+            title={isEditMode ? 'Save Changes' : 'Submit Session Review'}
             icon="checkmark-circle"
             isLoading={isLoading}
             isEnabled={hasCompletedForm}
             onPress={handleSubmit}
           />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -310,5 +402,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 8,
     paddingBottom: 40,
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

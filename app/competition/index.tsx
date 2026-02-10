@@ -10,9 +10,10 @@ import { formatToISO } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
@@ -40,8 +41,11 @@ export default function CompetitionReflectionScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
   const { getToken, userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const isEditMode = Boolean(editId);
+  const editItemId = Number(editId ?? 0);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -92,11 +96,76 @@ export default function CompetitionReflectionScreen() {
   const [focusNextMeet, setFocusNextMeet] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
     trackScreenView('competition_reflection');
     trackCompReflectionStarted();
   }, []);
+
+  React.useEffect(() => {
+    const hydrateEditState = async () => {
+      if (!isEditMode) {
+        setIsHydratingEditState(false);
+        return;
+      }
+      if (hasHydratedEditStateRef.current) return;
+      if (!userId || !editItemId) return;
+
+      hasHydratedEditStateRef.current = true;
+      setIsHydratingEditState(true);
+      try {
+        const { data, error } = await supabase
+          .from('journal_comp_report')
+          .select('*')
+          .eq('id', editItemId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+          Alert.alert('Entry not found', 'Unable to load this report.');
+          router.back();
+          return;
+        }
+
+        setMeetName(data.meet ?? '');
+        setSelectedMeetType(data.selected_meet_type ?? 'Local');
+        setMeetDate(new Date(data.meet_date));
+        setBodyweight(data.bodyweight ?? '');
+        setSnatch1(data.snatch1 ?? '');
+        setSnatch2(data.snatch2 ?? '');
+        setSnatch3(data.snatch3 ?? '');
+        setCj1(data.cj1 ?? '');
+        setCj2(data.cj2 ?? '');
+        setCj3(data.cj3 ?? '');
+        setPerformanceRating(data.performance_rating ?? 3);
+        setPhysicalPreparedness(data.physical_preparedness_rating ?? 3);
+        setMentalPreparedness(data.mental_preparedness_rating ?? 3);
+        setPressureHandling(data.pressure_handling ?? 3);
+        setSatisfaction(data.satisfaction ?? 3);
+        setConfidence(data.confidence ?? 3);
+        setNutrition(data.nutrition ?? '');
+        setHydration(data.hydration ?? '');
+        setDidWell(data.did_well ?? '');
+        setWhatProudOf(data.what_proud_of ?? '');
+        setGoodFromTraining(data.good_from_training ?? '');
+        setCues(data.cues ?? '');
+        setWhatLearned(data.what_learned ?? '');
+        setNeedsWork(data.needs_work ?? '');
+        setFocusNextMeet(data.focus ?? '');
+      } catch (err) {
+        console.error('Error loading competition report for edit:', err);
+        Alert.alert('Unable to load entry', 'Please try again.');
+        router.back();
+      } finally {
+        setIsHydratingEditState(false);
+      }
+    };
+
+    hydrateEditState();
+  }, [editItemId, isEditMode, router, supabase, userId]);
 
   const hasCompletedForm = meetName.length > 0 && bodyweight.length > 0;
 
@@ -126,8 +195,7 @@ export default function CompetitionReflectionScreen() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('journal_comp_report').insert({
-        user_id: userId,
+      const payload = {
         meet: meetName,
         selected_meet_type: selectedMeetType,
         meet_date: formatToISO(meetDate),
@@ -155,21 +223,49 @@ export default function CompetitionReflectionScreen() {
         cj3,
         snatch_best: calculateBest(snatch1, snatch2, snatch3),
         cj_best: calculateBest(cj1, cj2, cj3),
-        created_at: new Date().toISOString(),
-      });
+      };
+
+      const { error } = isEditMode
+        ? await supabase
+            .from('journal_comp_report')
+            .update(payload)
+            .eq('id', editItemId)
+            .eq('user_id', userId)
+        : await supabase.from('journal_comp_report').insert({
+            ...payload,
+            user_id: userId,
+            created_at: new Date().toISOString(),
+          });
 
       if (error) {
         throw error;
       }
 
       trackCompReflectionSubmitted(meetName, selectedMeetType, performanceRating);
-
-      Alert.alert('Success!', 'Your competition report has been submitted.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (isEditMode) {
+        Alert.alert('Saved', 'Your competition report has been updated.', [
+          {
+            text: 'OK',
+            onPress: () =>
+              router.replace({
+                pathname: '/history/[id]',
+                params: { id: String(editItemId), type: 'Meets' },
+              }),
+          },
+        ]);
+      } else {
+        Alert.alert('Success!', 'Your competition report has been submitted.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (err) {
       console.error('Error submitting competition report:', err);
-      Alert.alert('Submission failed', 'Unable to save your competition report. Please try again.');
+      Alert.alert(
+        isEditMode ? 'Update failed' : 'Submission failed',
+        isEditMode
+          ? 'Unable to update your competition report. Please try again.'
+          : 'Unable to save your competition report. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -188,10 +284,16 @@ export default function CompetitionReflectionScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.gold} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-            Competition Report
+            {isEditMode ? 'Edit Competition Report' : 'Competition Report'}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
+
+        {isHydratingEditState ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        ) : (
 
         <ScrollView
           ref={scrollViewRef}
@@ -421,7 +523,7 @@ export default function CompetitionReflectionScreen() {
         />
 
           <FormSubmitButton
-            title="Submit Comp Report"
+            title={isEditMode ? 'Save Changes' : 'Submit Comp Report'}
             icon="trophy"
             isLoading={isLoading}
             isEnabled={hasCompletedForm}
@@ -429,6 +531,7 @@ export default function CompetitionReflectionScreen() {
             onPress={handleSubmit}
           />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -462,6 +565,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 8,
     paddingBottom: 40,
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   meetNameCard: {
     marginHorizontal: 16,

@@ -668,6 +668,20 @@ Powered By Forge - Performance Journal`;
     setMenuVisible(true);
   };
 
+  const handleEditReflection = () => {
+    const pathname =
+      type === 'Check-Ins'
+        ? '/check-in'
+        : type === 'Workouts'
+          ? '/workout'
+          : '/competition';
+
+    router.replace({
+      pathname: pathname as any,
+      params: { editId: String(numId) },
+    });
+  };
+
   const renderCheckInContent = (checkIn: CheckIn) => (
     <>
       <WearableDataSection dateString={checkIn.check_in_date} isDark={isDark} />
@@ -1000,6 +1014,17 @@ Powered By Forge - Performance Journal`;
             ]}
             onPress={() => {}}
           >
+            <Pressable
+              style={[styles.menuAction, { backgroundColor: isDark ? '#2F2F2F' : '#F1F1F1' }]}
+              onPress={() => {
+                setMenuVisible(false);
+                handleEditReflection();
+              }}
+            >
+              <Text style={[styles.menuActionText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+                Edit Reflection
+              </Text>
+            </Pressable>
             <Pressable
               style={[styles.menuAction, { backgroundColor: isDark ? '#2F2F2F' : '#F1F1F1' }]}
               onPress={async () => {
