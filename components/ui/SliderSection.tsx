@@ -2,7 +2,7 @@ import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 
 const DRAG_HANDLE_SIZE = 32;
@@ -32,6 +32,7 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const showCustomHandle = Platform.OS !== 'ios';
   const [sliderWidth, setSliderWidth] = React.useState(0);
 
   const range = Math.max(maxValue - minValue, 1);
@@ -45,7 +46,6 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
         ? colors.scoreGreen
         : colors.blueEnergy
     : colors.blueEnergy;
-
   const dragHandleX = sliderWidth * normalizedValue;
 
   return (
@@ -90,6 +90,7 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
             maximumValue={maxValue}
             step={1}
             value={value}
+            renderStepNumber={false}
             onValueChange={(val) => onValueChange(Math.round(val))}
             onSlidingComplete={(val) => onValueChange(Math.round(val))}
             minimumTrackTintColor={ratingColor}
@@ -97,24 +98,29 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
             thumbTintColor="transparent"
             tapToSeek
           />
-          <View
-            pointerEvents="none"
-            style={[
-              styles.dragHandle,
-              {
-                left: Math.max(0, Math.min(dragHandleX - DRAG_HANDLE_SIZE / 2, sliderWidth - DRAG_HANDLE_SIZE)),
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={[ratingColor, `${ratingColor}CC`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.dragHandleInner}
+          {showCustomHandle && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.dragHandle,
+                {
+                  left: Math.max(
+                    0,
+                    Math.min(dragHandleX - DRAG_HANDLE_SIZE / 2, sliderWidth - DRAG_HANDLE_SIZE)
+                  ),
+                },
+              ]}
             >
-              <Ionicons name="reorder-horizontal" size={20} color="#FFFFFF" />
-            </LinearGradient>
-          </View>
+              <LinearGradient
+                colors={[ratingColor, `${ratingColor}CC`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.dragHandleInner}
+              >
+                <Ionicons name="reorder-horizontal" size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </View>
+          )}
         </View>
 
         <View style={styles.labelsContainer}>

@@ -12,10 +12,14 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInputFocusEventData,
   useColorScheme,
   View,
 } from 'react-native';
@@ -38,6 +42,7 @@ export default function WorkoutReflectionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getToken, userId } = useAuth();
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -73,6 +78,17 @@ export default function WorkoutReflectionScreen() {
   }, []);
 
   const hasCompletedForm = cues.length > 0;
+
+  const handleInputFocus = React.useCallback(
+    (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+      const target = event.nativeEvent.target;
+      if (!target) return;
+      setTimeout(() => {
+        (scrollViewRef.current as any)?.scrollResponderScrollNativeHandleToKeyboard(target, 100, true);
+      }, 60);
+    },
+    []
+  );
 
   const handleSubmit = async () => {
     if (!userId) {
@@ -120,18 +136,31 @@ export default function WorkoutReflectionScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-          Session Reflection
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.container}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Session Reflection
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <DatePickerSection title="Session Date:" value={sessionDate} onChange={setSessionDate} />
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        >
+          <DatePickerSection title="Session Date:" value={sessionDate} onChange={setSessionDate} />
 
         <MultipleChoiceSection
           title="What time of day did you train?"
@@ -193,6 +222,7 @@ export default function WorkoutReflectionScreen() {
           title="What cues made a difference?"
           value={cues}
           onChangeText={setCues}
+          onFocus={handleInputFocus}
           placeholder="Enter helpful cues..."
         />
 
@@ -227,6 +257,7 @@ export default function WorkoutReflectionScreen() {
           title="Did you learn anything about yourself during this session?"
           value={whatLearned}
           onChangeText={setWhatLearned}
+          onFocus={handleInputFocus}
           placeholder="Enter any insights..."
         />
 
@@ -234,17 +265,19 @@ export default function WorkoutReflectionScreen() {
           title="Would you do anything differently next time?"
           value={whatWouldChange}
           onChangeText={setWhatWouldChange}
+          onFocus={handleInputFocus}
           placeholder="Enter any changes..."
         />
 
-        <FormSubmitButton
-          title="Submit Session Review"
-          icon="checkmark-circle"
-          isLoading={isLoading}
-          isEnabled={hasCompletedForm}
-          onPress={handleSubmit}
-        />
-      </ScrollView>
+          <FormSubmitButton
+            title="Submit Session Review"
+            icon="checkmark-circle"
+            isLoading={isLoading}
+            isEnabled={hasCompletedForm}
+            onPress={handleSubmit}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

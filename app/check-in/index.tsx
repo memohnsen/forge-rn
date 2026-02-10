@@ -12,10 +12,14 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInputFocusEventData,
   useColorScheme,
   View,
 } from 'react-native';
@@ -32,6 +36,7 @@ export default function CheckInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getToken, userId } = useAuth();
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -79,6 +84,17 @@ export default function CheckInScreen() {
   const overallScore = Math.round((physicalScore + mentalScore) / 2);
 
   const hasCompletedForm = goal.length > 0;
+
+  const handleInputFocus = React.useCallback(
+    (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+      const target = event.nativeEvent.target;
+      if (!target) return;
+      setTimeout(() => {
+        (scrollViewRef.current as any)?.scrollResponderScrollNativeHandleToKeyboard(target, 100, true);
+      }, 60);
+    },
+    []
+  );
 
   const handleSubmit = async () => {
     if (!userId) {
@@ -139,18 +155,31 @@ export default function CheckInScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-          Daily Check-In
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.container}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Daily Check-In
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <DatePickerSection title="Session date:" value={sessionDate} onChange={setSessionDate} />
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        >
+          <DatePickerSection title="Session date:" value={sessionDate} onChange={setSessionDate} />
 
         <MultipleChoiceSection
           title="What's the main movement for the session?"
@@ -170,6 +199,7 @@ export default function CheckInScreen() {
           title="What would make today feel like a successful session for you?"
           value={goal}
           onChangeText={setGoal}
+          onFocus={handleInputFocus}
           placeholder="Enter your goal..."
         />
 
@@ -286,17 +316,19 @@ export default function CheckInScreen() {
           title="What concerns or worries do you have going into today's session?"
           value={concerns}
           onChangeText={setConcerns}
+          onFocus={handleInputFocus}
           placeholder="Enter any concerns..."
         />
 
-        <FormSubmitButton
-          title="Submit Check-In"
-          icon="checkmark-circle"
-          isLoading={isLoading}
-          isEnabled={hasCompletedForm}
-          onPress={handleSubmit}
-        />
-      </ScrollView>
+          <FormSubmitButton
+            title="Submit Check-In"
+            icon="checkmark-circle"
+            isLoading={isLoading}
+            isEnabled={hasCompletedForm}
+            onPress={handleSubmit}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

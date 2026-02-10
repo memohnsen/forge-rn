@@ -19,12 +19,14 @@ import {
   Animated,
   Dimensions,
   KeyboardAvoidingView,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextInputFocusEventData,
   useColorScheme,
   View,
 } from 'react-native';
@@ -210,6 +212,17 @@ export default function OnboardingScreen() {
 
   const isTrainingDaysValid = Object.keys(data.trainingDays).length > 0;
 
+  const handleInputFocus = React.useCallback(
+    (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+      const target = event.nativeEvent.target;
+      if (!target) return;
+      setTimeout(() => {
+        (scrollViewRef.current as any)?.scrollResponderScrollNativeHandleToKeyboard(target, 100, true);
+      }, 60);
+    },
+    []
+  );
+
   const handleCompleteOnboarding = async () => {
     // Guard against re-entrancy from rapid taps
     if (isLoading) return;
@@ -369,13 +382,18 @@ export default function OnboardingScreen() {
     return (
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           <SectionHeader
             title="Understanding You"
@@ -394,6 +412,7 @@ export default function OnboardingScreen() {
             title="What's been your biggest frustration with training lately?"
             value={data.biggestFrustration}
             onChangeText={(text) => updateData({ biggestFrustration: text })}
+            onFocus={handleInputFocus}
             placeholder="Enter your frustration..."
           />
 
@@ -408,6 +427,7 @@ export default function OnboardingScreen() {
             title="What do you think is holding you back from your best performance?"
             value={data.whatHoldingBack}
             onChangeText={(text) => updateData({ whatHoldingBack: text })}
+            onFocus={handleInputFocus}
             placeholder="Enter your barrier..."
           />
 
@@ -429,13 +449,18 @@ export default function OnboardingScreen() {
     return (
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           <SectionHeader title="Building Your Profile" isDark={isDark} />
 
@@ -444,6 +469,7 @@ export default function OnboardingScreen() {
               style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
               value={data.firstName}
               onChangeText={(text) => updateData({ firstName: text })}
+              onFocus={handleInputFocus}
               placeholder="First Name"
               placeholderTextColor="#999"
             />
@@ -454,6 +480,7 @@ export default function OnboardingScreen() {
               style={[styles.textInput, { color: isDark ? '#FFFFFF' : '#000000' }]}
               value={data.lastName}
               onChangeText={(text) => updateData({ lastName: text })}
+              onFocus={handleInputFocus}
               placeholder="Last Name"
               placeholderTextColor="#999"
             />
@@ -504,13 +531,18 @@ export default function OnboardingScreen() {
     return (
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F5F5F5' }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           <SectionHeader title="Building Your Profile" isDark={isDark} />
 
@@ -518,6 +550,7 @@ export default function OnboardingScreen() {
             title="What's your next 6-12 month goal?"
             value={data.goal}
             onChangeText={(text) => updateData({ goal: text })}
+            onFocus={handleInputFocus}
             placeholder="Enter your goal..."
           />
 
@@ -532,6 +565,7 @@ export default function OnboardingScreen() {
             title="What's your next meet?"
             value={data.nextComp}
             onChangeText={(text) => updateData({ nextComp: text })}
+            onFocus={handleInputFocus}
             placeholder="Enter meet name..."
             multiline={false}
           />

@@ -226,14 +226,14 @@ struct MeetWidgetEntryView: View {
     }
 }
 
-#Preview(as: .systemSmall) {
-    JournalWidget()
-} timeline: {
-    SimpleEntry(date: .now, meetName: "State Championships", meetDate: "2025-03-15", daysUntilMeet: 45, sessionsLeft: 18)
-}
+// #Preview(as: .systemSmall) {
+//     JournalWidget()
+// } timeline: {
+//     SimpleEntry(date: .now, meetName: "State Championships", meetDate: "2025-03-15", daysUntilMeet: 45, sessionsLeft: 18)
+// }
 
-#Preview(as: .systemMedium) {
-    JournalWidget()
-} timeline: {
-    SimpleEntry(date: .now, meetName: "State Championships", meetDate: "2025-03-15", daysUntilMeet: 45, sessionsLeft: 18)
-}
+// #Preview(as: .systemMedium) {
+//     JournalWidget()
+// } timeline: {
+//     SimpleEntry(date: .now, meetName: "State Championships", meetDate: "2025-03-15", daysUntilMeet: 45, sessionsLeft: 18)
+// }

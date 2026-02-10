@@ -14,11 +14,15 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextInputFocusEventData,
   useColorScheme,
   View,
 } from 'react-native';
@@ -37,6 +41,7 @@ export default function CompetitionReflectionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getToken, userId } = useAuth();
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const supabase = useMemo(() => {
     return createClerkSupabaseClient(async () => {
@@ -102,6 +107,17 @@ export default function CompetitionReflectionScreen() {
     return values.length ? Math.max(...values) : 0;
   };
 
+  const handleInputFocus = React.useCallback(
+    (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+      const target = event.nativeEvent.target;
+      if (!target) return;
+      setTimeout(() => {
+        (scrollViewRef.current as any)?.scrollResponderScrollNativeHandleToKeyboard(target, 100, true);
+      }, 60);
+    },
+    []
+  );
+
   const handleSubmit = async () => {
     if (!userId) {
       Alert.alert('Sign in required', 'Please sign in before submitting a competition report.');
@@ -161,55 +177,69 @@ export default function CompetitionReflectionScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.gold} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-          Competition Report
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.container}
+        enabled={Platform.OS === 'android'}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.gold} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Competition Report
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Meet Name Section */}
-        <View
-          style={[
-            styles.meetNameCard,
-            {
-              backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
-              borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
-              boxShadow: isDark
-                ? `0 4px 12px ${colors.blueEnergy}20`
-                : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
-            },
-          ]}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <View style={styles.meetNameHeader}>
-            <LinearGradient
-              colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconCircle}
-            >
-              <Ionicons name="trophy" size={18} color={colors.gold} />
-            </LinearGradient>
-            <Text style={styles.meetNameLabel}>Which meet did you compete at?</Text>
-          </View>
-          <TextInput
+          {/* Meet Name Section */}
+          <View
             style={[
-              styles.meetNameInput,
+              styles.meetNameCard,
               {
-                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
-                color: isDark ? '#FFFFFF' : '#000000',
+                backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
+                borderColor: isDark ? `${colors.blueEnergy}33` : `${colors.blueEnergy}20`,
+                boxShadow: isDark
+                  ? `0 4px 12px ${colors.blueEnergy}20`
+                  : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${colors.blueEnergy}30`,
               },
             ]}
-            value={meetName}
-            onChangeText={setMeetName}
-            placeholder="Enter your meet..."
-            placeholderTextColor="#999"
-          />
-        </View>
+          >
+            <View style={styles.meetNameHeader}>
+              <LinearGradient
+                colors={[`${colors.blueEnergy}40`, `${colors.blueEnergy}1A`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.iconCircle}
+              >
+                <Ionicons name="trophy" size={18} color={colors.gold} />
+              </LinearGradient>
+              <Text style={styles.meetNameLabel}>Which meet did you compete at?</Text>
+            </View>
+            <TextInput
+              style={[
+                styles.meetNameInput,
+                {
+                  backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
+                  color: isDark ? '#FFFFFF' : '#000000',
+                },
+              ]}
+              value={meetName}
+              onChangeText={setMeetName}
+              onFocus={handleInputFocus}
+              placeholder="Enter your meet..."
+              placeholderTextColor="#999"
+            />
+          </View>
 
         <MultipleChoiceSection
           title="What type of meet was this?"
@@ -224,6 +254,7 @@ export default function CompetitionReflectionScreen() {
           title="What was your bodyweight?"
           value={bodyweight}
           onChangeText={setBodyweight}
+          onFocus={handleInputFocus}
           placeholder="Enter bodyweight (kg)..."
           multiline={true}
         />
@@ -321,6 +352,7 @@ export default function CompetitionReflectionScreen() {
           title="What was your nutrition like during the meet?"
           value={nutrition}
           onChangeText={setNutrition}
+          onFocus={handleInputFocus}
           placeholder="Describe your nutrition..."
         />
 
@@ -328,6 +360,7 @@ export default function CompetitionReflectionScreen() {
           title="What was your hydration like during the meet?"
           value={hydration}
           onChangeText={setHydration}
+          onFocus={handleInputFocus}
           placeholder="Describe your hydration..."
         />
 
@@ -335,6 +368,7 @@ export default function CompetitionReflectionScreen() {
           title="What did you do well?"
           value={didWell}
           onChangeText={setDidWell}
+          onFocus={handleInputFocus}
           placeholder="Enter what went well..."
         />
 
@@ -342,6 +376,7 @@ export default function CompetitionReflectionScreen() {
           title="What are you most proud of from this meet?"
           value={whatProudOf}
           onChangeText={setWhatProudOf}
+          onFocus={handleInputFocus}
           placeholder="Enter what you're proud of..."
         />
 
@@ -349,6 +384,7 @@ export default function CompetitionReflectionScreen() {
           title="What in training helped you feel prepared for the platform?"
           value={goodFromTraining}
           onChangeText={setGoodFromTraining}
+          onFocus={handleInputFocus}
           placeholder="Enter what helped..."
         />
 
@@ -356,6 +392,7 @@ export default function CompetitionReflectionScreen() {
           title="What cues worked best for you?"
           value={cues}
           onChangeText={setCues}
+          onFocus={handleInputFocus}
           placeholder="Enter helpful cues..."
         />
 
@@ -363,6 +400,7 @@ export default function CompetitionReflectionScreen() {
           title="What did you learn about yourself during this meet?"
           value={whatLearned}
           onChangeText={setWhatLearned}
+          onFocus={handleInputFocus}
           placeholder="Enter any insights..."
         />
 
@@ -370,6 +408,7 @@ export default function CompetitionReflectionScreen() {
           title="What could you have done better?"
           value={needsWork}
           onChangeText={setNeedsWork}
+          onFocus={handleInputFocus}
           placeholder="Enter areas for improvement..."
         />
 
@@ -377,18 +416,20 @@ export default function CompetitionReflectionScreen() {
           title="What do you need to focus on for the next meet?"
           value={focusNextMeet}
           onChangeText={setFocusNextMeet}
+          onFocus={handleInputFocus}
           placeholder="Enter your focus areas..."
         />
 
-        <FormSubmitButton
-          title="Submit Comp Report"
-          icon="trophy"
-          isLoading={isLoading}
-          isEnabled={hasCompletedForm}
-          accentColor={colors.gold}
-          onPress={handleSubmit}
-        />
-      </ScrollView>
+          <FormSubmitButton
+            title="Submit Comp Report"
+            icon="trophy"
+            isLoading={isLoading}
+            isEnabled={hasCompletedForm}
+            accentColor={colors.gold}
+            onPress={handleSubmit}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

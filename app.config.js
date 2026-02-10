@@ -1,9 +1,9 @@
-const IS_DEV = process.env.APP_VARIANT === 'development';
-const APP_GROUP = 'group.com.memohnsen.forge.JournalWidget';
+const IS_DEV = process.env.APP_VARIANT === "development";
+const APP_GROUP = "group.com.memohnsen.forge.JournalWidget";
 
 export default {
   expo: {
-    name: IS_DEV ? 'Forge Dev' : 'Forge',
+    name: IS_DEV ? "Forge Dev" : "Forge",
     slug: "forge",
     version: "1.0.0",
     orientation: "portrait",
@@ -13,36 +13,39 @@ export default {
     newArchEnabled: true,
     ios: {
       supportsTablet: false,
+      deploymentTarget: 18.0,
       appleTeamId: "HCK9FFW6UX",
-      bundleIdentifier: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',
+      bundleIdentifier: IS_DEV
+        ? "com.memohnsen.forge.dev"
+        : "com.memohnsen.forge",
       icon: "./assets/images/icon.icon",
       entitlements: {
-        "com.apple.security.application-groups": [APP_GROUP]
-      }
+        "com.apple.security.application-groups": [APP_GROUP],
+      },
     },
     android: {
-      package: IS_DEV ? 'com.memohnsen.forge.dev' : 'com.memohnsen.forge',
+      package: IS_DEV ? "com.memohnsen.forge.dev" : "com.memohnsen.forge",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon.png",
         backgroundImage: "./assets/images/android-icon.png",
-        monochromeImage: "./assets/images/android-icon.png"
+        monochromeImage: "./assets/images/android-icon.png",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      navigationBarColor: "#000000"
+      navigationBarColor: "#000000",
     },
     web: {
       output: "static",
-      favicon: "./assets/images/logo.png"
+      favicon: "./assets/images/logo.png",
     },
     plugins: [
       "expo-router",
       [
         "expo-av",
         {
-          microphonePermission: false
-        }
+          microphonePermission: false,
+        },
       ],
       "@bacons/apple-targets",
       [
@@ -53,27 +56,27 @@ export default {
           resizeMode: "contain",
           backgroundColor: "#ffffff",
           dark: {
-            backgroundColor: "#000000"
-          }
+            backgroundColor: "#000000",
+          },
         },
-      ]
+      ],
     ],
     experiments: {
       typedRoutes: true,
-      reactCompiler: true
+      reactCompiler: true,
     },
     extra: {
       router: {},
       eas: {
-        projectId: "21a35af4-b604-4bcd-a950-0f035cc4a67e"
-      }
+        projectId: "21a35af4-b604-4bcd-a950-0f035cc4a67e",
+      },
     },
     owner: "memohnsen",
     updates: {
-    url: "https://u.expo.dev/21a35af4-b604-4bcd-a950-0f035cc4a67e"
+      url: "https://u.expo.dev/21a35af4-b604-4bcd-a950-0f035cc4a67e",
     },
     runtimeVersion: {
-      policy: "appVersion"
-    }
-  }
-}
+      policy: "appVersion",
+    },
+  },
+};

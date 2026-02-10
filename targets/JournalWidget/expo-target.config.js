@@ -3,7 +3,7 @@ module.exports = (config) => ({
   name: 'JournalWidget',
   displayName: 'Forge',
   bundleIdentifier: '.journalwidget',
-  deploymentTarget: '16.0',
+  deploymentTarget: '18.0',
   frameworks: ['SwiftUI', 'WidgetKit'],
   entitlements: {
     'com.apple.security.application-groups':

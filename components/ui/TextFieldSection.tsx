@@ -2,12 +2,21 @@ import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import {
+  NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputFocusEventData,
+  useColorScheme,
+  View,
+} from 'react-native';
 
 interface TextFieldSectionProps {
   title: string;
   value: string;
   onChangeText: (text: string) => void;
+  onFocus?: (event: NativeSyntheticEvent<TextInputFocusEventData>) => void;
   placeholder?: string;
   multiline?: boolean;
 }
@@ -16,6 +25,7 @@ export const TextFieldSection: React.FC<TextFieldSectionProps> = ({
   title,
   value,
   onChangeText,
+  onFocus,
   placeholder = 'Enter your response...',
   multiline = true,
 }) => {
@@ -58,6 +68,7 @@ export const TextFieldSection: React.FC<TextFieldSectionProps> = ({
         ]}
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
         placeholder={placeholder}
         placeholderTextColor="#999"
         multiline={multiline}
