@@ -190,40 +190,42 @@ export default function SettingsScreen() {
 
         {__DEV__ && (
           <>
-            <View style={styles.dangerHeader}>
+            <View style={[styles.dangerHeader, {paddingTop: 16} ]}>
               <View style={[styles.dangerDot, { backgroundColor: colors.blueEnergy }]} />
               <Text style={styles.dangerText}>DEV TOOLS</Text>
             </View>
-            <SettingsRow
-              icon="restart"
-              title="Replay Onboarding"
-              accentColor={colors.blueEnergy}
-              isDark={isDark}
-              onPress={async () => {
-                if (!userId) return;
-                await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
-                await SecureStore.deleteItemAsync(`hasSeenOnboarding_${userId}`);
-                router.replace('/(onboarding)');
-              }}
-            />
-            <SettingsRow
-              icon="check-circle"
-              title="Check-In Confirmation"
-              accentColor={colors.scoreGreen}
-              isDark={isDark}
-              onPress={() => {
-                router.push({
-                  pathname: '/check-in/confirmation',
-                  params: {
-                    overallScore: '82',
-                    physicalScore: '78',
-                    mentalScore: '86',
-                    selectedLift: 'Squat',
-                    selectedIntensity: 'Heavy',
-                  },
-                });
-              }}
-            />
+            <View style={{ gap: 12}}>
+              <SettingsRow
+                icon="restart"
+                title="Replay Onboarding"
+                accentColor={colors.blueEnergy}
+                isDark={isDark}
+                onPress={async () => {
+                  if (!userId) return;
+                  await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
+                  await SecureStore.deleteItemAsync(`hasSeenOnboarding_${userId}`);
+                  router.replace('/(onboarding)');
+                }}
+                />
+              <SettingsRow
+                icon="check-circle"
+                title="Check-In Confirmation"
+                accentColor={colors.scoreGreen}
+                isDark={isDark}
+                onPress={() => {
+                  router.push({
+                    pathname: '/check-in/confirmation',
+                    params: {
+                      overallScore: '82',
+                      physicalScore: '78',
+                      mentalScore: '86',
+                      selectedLift: 'Squat',
+                      selectedIntensity: 'Heavy',
+                    },
+                  });
+                }}
+                />
+            </View>
           </>
         )}
 
