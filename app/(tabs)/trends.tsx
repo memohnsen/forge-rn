@@ -20,10 +20,12 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import {
+import Animated, {
   useSharedValue,
   withTiming,
+  withRepeat,
   useAnimatedProps,
+  useAnimatedStyle,
   createAnimatedComponent,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,7 +40,7 @@ export default function TrendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { categories, ouraConnected, whoopConnected } = useTrends();
+  const { categories, ouraConnected, whoopConnected, isLoading } = useTrends();
 
   const [selectedFilter, setSelectedFilter] = useState('Check-Ins');
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('Last 30 Days');
@@ -247,7 +249,13 @@ export default function TrendsScreen() {
           </View>
         </Pressable>
 
-        {currentCategory && hasSelectedCharts(currentCategory) ? (
+        {isLoading ? (
+          <View style={styles.chartsWrapper}>
+            {[0, 1, 2].map((i) => (
+              <SkeletonCard key={i} isDark={isDark} />
+            ))}
+          </View>
+        ) : currentCategory && hasSelectedCharts(currentCategory) ? (
           <View style={styles.chartsWrapper}>
             {currentCategory.charts
               .filter((chart) => selectedCharts.has(chart.id))
@@ -296,6 +304,39 @@ export default function TrendsScreen() {
         isDark={isDark}
       />
 
+    </View>
+  );
+}
+
+function SkeletonCard({ isDark }: { isDark: boolean }) {
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(0.4, { duration: 700 }), -1, true);
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  const base = isDark ? '#2A2A2A' : '#E5E5E5';
+  const shimmer = isDark ? '#333333' : '#EBEBEB';
+
+  return (
+    <View
+      style={[
+        styles.chartCard,
+        { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF', borderColor: isDark ? '#2A2A2A' : '#E5E5E5' },
+      ]}
+    >
+      <View style={styles.chartHeader}>
+        <Animated.View style={[{ width: 120, height: 14, borderRadius: 7, backgroundColor: base }, animStyle]} />
+        <Animated.View style={[{ width: 52, height: 24, borderRadius: 12, backgroundColor: shimmer }, animStyle]} />
+      </View>
+      <Animated.View
+        style={[
+          { marginTop: 16, height: 80, borderRadius: 10, backgroundColor: base },
+          animStyle,
+        ]}
+      />
     </View>
   );
 }
