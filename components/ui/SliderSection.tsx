@@ -1,5 +1,4 @@
 import { colors } from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
@@ -65,14 +64,6 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
       ]}
     >
       <View style={styles.header}>
-        <LinearGradient
-          colors={[`${accent}40`, `${accent}1A`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.iconCircle}
-        >
-          <Ionicons name="analytics" size={18} color={accent} />
-        </LinearGradient>
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>{title}</Text>
       </View>
 
@@ -83,24 +74,26 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
           </View>
         </View>
 
-        <View
-          style={styles.sliderWrapper}
-          onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
-        >
-          <Slider
-            style={styles.slider}
-            minimumValue={minValue}
-            maximumValue={maxValue}
-            step={1}
-            value={value}
-            renderStepNumber={false}
-            onValueChange={(val) => onValueChange(Math.round(val))}
-            onSlidingComplete={(val) => onValueChange(Math.round(val))}
-            minimumTrackTintColor={ratingColor}
-            maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
-            thumbTintColor="transparent"
-            tapToSeek
-          />
+        <View style={styles.sliderWrapperOuter}>
+          <View
+            style={styles.sliderWrapper}
+            onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
+          >
+            <Slider
+              style={styles.slider}
+              minimumValue={minValue}
+              maximumValue={maxValue}
+              step={1}
+              value={value}
+              renderStepNumber={false}
+              onValueChange={(val) => onValueChange(Math.round(val))}
+              onSlidingComplete={(val) => onValueChange(Math.round(val))}
+              minimumTrackTintColor={ratingColor}
+              maximumTrackTintColor={isDark ? '#333' : '#E5E5E5'}
+              thumbTintColor="transparent"
+              tapToSeek
+            />
+          </View>
           {showCustomHandle && (
             <View
               pointerEvents="none"
@@ -115,13 +108,11 @@ export const SliderSection: React.FC<SliderSectionProps> = ({
               ]}
             >
               <LinearGradient
-                colors={[ratingColor, `${ratingColor}CC`]}
+                colors={[ratingColor, ratingColor]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.dragHandleInner}
-              >
-                <Ionicons name="reorder-horizontal" size={20} color="#FFFFFF" />
-              </LinearGradient>
+              />
             </View>
           )}
         </View>
@@ -147,15 +138,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
     marginBottom: 16,
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
     flex: 1,
@@ -165,6 +148,11 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     gap: 8,
+  },
+  sliderWrapperOuter: {
+    position: 'relative',
+    justifyContent: 'center',
+    minHeight: 52,
   },
   sliderWrapper: {
     justifyContent: 'center',
@@ -189,9 +177,11 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     position: 'absolute',
-    top: 10,
+    top: 6 + (52 - DRAG_HANDLE_SIZE) / 2,
     width: DRAG_HANDLE_SIZE,
     height: DRAG_HANDLE_SIZE,
+    zIndex: 10,
+    elevation: 10,
   },
   dragHandleInner: {
     width: DRAG_HANDLE_SIZE,
@@ -200,6 +190,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     boxShadow: '0 3px 10px rgba(0,0,0,0.22)',
+    elevation: 20,
   },
   labelsContainer: {
     flexDirection: 'row',
