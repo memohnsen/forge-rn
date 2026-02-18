@@ -63,6 +63,14 @@ export default {
           },
         },
       ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "forge",
+          "organization": "meetcal-llc"
+        }
+      ],
     ],
     experiments: {
       typedRoutes: true,

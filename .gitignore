@@ -57,3 +57,4 @@ package-lock.json
 .claude/
 
 .vscode/
+.env.local

@@ -11,11 +11,38 @@ import {
   trackUserSignedOut,
 } from '@/utils/analytics';
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import * as Sentry from '@sentry/react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { PostHogProvider } from 'posthog-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+
+Sentry.init({
+  dsn: 'https://83000146970b6f3f4b2b92bfa83d998c@o4510884729847808.ingest.us.sentry.io/4510909168680960',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Set tracesSampleRate to 1.0 to capture 100% of transactions for tracing.
+  // We recommend adjusting this value in production.
+  tracesSampleRate: 1.0,
+  // profilesSampleRate is relative to tracesSampleRate.
+  // Here, we'll capture profiles for 100% of transactions.
+  profilesSampleRate: 1.0,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 const tokenCache = {
   async getToken(key: string) {
@@ -288,7 +315,7 @@ function InitialLayout() {
   );
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   useEasUpdates();
 
   const content = (
@@ -306,7 +333,7 @@ export default function RootLayout() {
   }
 
   return <PostHogProvider client={posthog}>{content}</PostHogProvider>;
-}
+});
 
 const styles = StyleSheet.create({
   splashOverlay: {
