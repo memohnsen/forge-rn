@@ -155,13 +155,7 @@ export default function TrendsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + 16, paddingBottom: 120 },
-        ]}
-      >
+      <View style={{ paddingTop: insets.top + 16 }}>
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.pageTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
@@ -221,7 +215,12 @@ export default function TrendsScreen() {
             );
           })}
         </ScrollView>
+      </View>
 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 }]}
+      >
         <Pressable onPress={() => router.push('/trends/ai')} style={styles.aiCardWrapper}>
           <View
             style={[

@@ -116,12 +116,14 @@ export default function SettingsScreen() {
     <View
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#000000' : '#F2F2F7', paddingTop: insets.top + 16 },
+        { backgroundColor: isDark ? '#000000' : '#F2F2F7' },
       ]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={{ paddingTop: insets.top + 16 }}>
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#000000' }]}>Settings</Text>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
           <SettingsRow
             icon="bell"

@@ -108,14 +108,16 @@ export default function ExercisesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
-      >
+      <View style={{ paddingTop: insets.top + 16 }}>
         <Text style={[styles.pageTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
           Exercises
         </Text>
+      </View>
 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.cards}>
           {EXERCISES.map((exercise, index) => (
             <Animated.View key={exercise.title} style={animatedStyles[index]}>

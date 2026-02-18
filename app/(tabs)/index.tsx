@@ -7,7 +7,6 @@ import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
 import { formatDate, formatToISO } from '@/utils/dateFormatter';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -164,7 +163,7 @@ export default function HomeScreen() {
   const profileInitial = (clerkUser?.firstName || firstName).charAt(0).toUpperCase();
 
   const HeaderContent = () => (
-    <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#ffffff' }}>
+    <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>{formattedToday}</Text>
@@ -255,13 +254,11 @@ export default function HomeScreen() {
             <HeaderContent />
           </GlassView>
         ) : (
-          <BlurView
-            intensity={80}
-            tint={isDark ? 'dark' : 'light'}
-            style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden' }}
+          <View
+            style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', backgroundColor: isDark ? '#111' : '#E8E8EE' }}
           >
             <HeaderContent />
-          </BlurView>
+          </View>
         )}
       </Animated.View>
 
