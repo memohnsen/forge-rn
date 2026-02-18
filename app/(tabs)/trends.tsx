@@ -20,8 +20,16 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import {
+  useSharedValue,
+  withTiming,
+  useAnimatedProps,
+  createAnimatedComponent,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Stop, LinearGradient as SvgLinearGradient, Text as SvgText } from 'react-native-svg';
+
+const AnimatedPath = createAnimatedComponent(Path);
 
 
 export default function TrendsScreen() {
@@ -484,6 +492,17 @@ function ChartSelectionSheet({
 }
 
 
+// Approximate path length for a polyline given coords
+function approximatePathLength(coords: { x: number; y: number }[]): number {
+  let length = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const dx = coords[i].x - coords[i - 1].x;
+    const dy = coords[i].y - coords[i - 1].y;
+    length += Math.sqrt(dx * dx + dy * dy);
+  }
+  return length || 300;
+}
+
 function Sparkline({
   data,
   color,
@@ -532,6 +551,24 @@ function Sparkline({
     gridValues.push(Number(value.toFixed(2)));
   }
 
+  // Draw-on animation
+  const pathLength = approximatePathLength(coords);
+  const dashOffset = useSharedValue(pathLength);
+  const fillOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    dashOffset.value = withTiming(0, { duration: 900 });
+    fillOpacity.value = withTiming(1, { duration: 1100 });
+  }, []);
+
+  const animatedLineProps = useAnimatedProps(() => ({
+    strokeDashoffset: dashOffset.value,
+  }));
+
+  const animatedFillProps = useAnimatedProps(() => ({
+    fillOpacity: fillOpacity.value,
+  }));
+
   return (
     <Svg width="100%" height={200} viewBox={`0 0 ${viewWidth} ${viewHeight}`}>
       <Defs>
@@ -568,16 +605,22 @@ function Sparkline({
       })}
 
       {fillPath ? (
-        <Path d={fillPath} fill={`url(#${gradientId})`} />
+        <AnimatedPath
+          d={fillPath}
+          fill={`url(#${gradientId})`}
+          animatedProps={animatedFillProps}
+        />
       ) : null}
 
-      <Path
+      <AnimatedPath
         d={linePath}
         stroke={color}
         strokeWidth={1.4}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
+        strokeDasharray={pathLength}
+        animatedProps={animatedLineProps}
       />
 
       {coords.map((c, index) => (

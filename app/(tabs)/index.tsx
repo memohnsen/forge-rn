@@ -3,6 +3,7 @@ import { HistorySection } from '@/components/sections/HistorySection';
 import { MeetCountdownCard } from '@/components/sections/MeetCountdownCard';
 import { ReflectionSection } from '@/components/sections/ReflectionSection';
 import { useHome } from '@/hooks/use-home';
+import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
 import { formatDate, formatToISO } from '@/utils/dateFormatter';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -28,7 +29,6 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { trackMeetUpdated, trackScreenView } from '@/utils/analytics';
 
 // Check for iOS 26+ (iOS 26 = version 26.0)
 const isIOS26OrLater = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 26;
@@ -164,7 +164,7 @@ export default function HomeScreen() {
   const profileInitial = (clerkUser?.firstName || firstName).charAt(0).toUpperCase();
 
   const HeaderContent = () => (
-    <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top }}>
+    <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#ffffff' }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>{formattedToday}</Text>
@@ -186,7 +186,7 @@ export default function HomeScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             overflow: 'hidden',
-            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0)' : 'rgba(0,0,0,0.08)',
           }}
           accessibilityRole="button"
           accessibilityLabel="Open profile"
