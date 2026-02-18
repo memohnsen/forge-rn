@@ -321,15 +321,16 @@ function SettingsRow({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
   },
   scrollContent: {
+    paddingHorizontal: 16,
     paddingBottom: 40,
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
   section: {
     gap: 10,
