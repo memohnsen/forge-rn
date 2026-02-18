@@ -225,6 +225,7 @@ export default function CheckInScreen() {
             mentalScore: mentalScore.toString(),
             selectedLift,
             selectedIntensity,
+            sessionDate: payload.check_in_date,
           },
         });
       }

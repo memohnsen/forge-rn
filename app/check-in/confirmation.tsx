@@ -1,27 +1,39 @@
 import { colors } from '@/constants/colors';
+import { createClerkSupabaseClient } from '@/services/supabase';
 import { trackContentShared } from '@/utils/analytics';
+import { formatToISO } from '@/utils/dateFormatter';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
+
+const SIGNIFICANT_TREND_MARGIN = 10;
+
+type TrendAlert = {
+  message: string;
+  color: string;
+};
 
 export default function CheckInConfirmationScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { getToken, userId } = useAuth();
 
-  const { overallScore, physicalScore, mentalScore, selectedLift, selectedIntensity } =
+  const { overallScore, physicalScore, mentalScore, selectedLift, selectedIntensity, sessionDate } =
     useLocalSearchParams<{
       overallScore: string;
       physicalScore: string;
       mentalScore: string;
       selectedLift: string;
       selectedIntensity: string;
+      sessionDate?: string;
     }>();
 
   const overall = parseInt(overallScore || '0');
@@ -42,7 +54,69 @@ export default function CheckInConfirmationScreen() {
 
   const overallColor = getScoreColor(overall);
   const [isSharingImage, setIsSharingImage] = useState(false);
+  const [trendAlert, setTrendAlert] = useState<TrendAlert | null>(null);
   const shareCardRef = useRef<View>(null);
+  const supabase = useMemo(() => {
+    return createClerkSupabaseClient(async () => {
+      return getToken({ template: 'supabase', skipCache: true });
+    });
+  }, [getToken]);
+
+  useEffect(() => {
+    const loadTrendAlert = async () => {
+      if (!userId) {
+        setTrendAlert(null);
+        return;
+      }
+
+      const anchorDate = sessionDate ? new Date(sessionDate) : new Date();
+      if (Number.isNaN(anchorDate.getTime())) {
+        setTrendAlert(null);
+        return;
+      }
+
+      const endDate = new Date(anchorDate);
+      const startDate = new Date(anchorDate);
+      startDate.setDate(startDate.getDate() - 14);
+
+      const { data, error } = await supabase
+        .from('journal_daily_checkins')
+        .select('overall_score')
+        .eq('user_id', userId)
+        .gte('check_in_date', formatToISO(startDate))
+        .lt('check_in_date', formatToISO(endDate));
+
+      if (error || !data?.length) {
+        setTrendAlert(null);
+        return;
+      }
+
+      const baselineAverage =
+        data.reduce((total, item) => total + (item.overall_score ?? 0), 0) / data.length;
+      const delta = overall - baselineAverage;
+      const absoluteDelta = Math.round(Math.abs(delta));
+
+      if (absoluteDelta < SIGNIFICANT_TREND_MARGIN) {
+        setTrendAlert(null);
+        return;
+      }
+
+      if (delta > 0) {
+        setTrendAlert({
+          message: `Alert: You're trending upward ${absoluteDelta} points above your 2-week average.`,
+          color: colors.scoreGreen,
+        });
+        return;
+      }
+
+      setTrendAlert({
+        message: `Alert: You're trending downward ${absoluteDelta} points below your 2-week average.`,
+        color: colors.scoreRed,
+      });
+    };
+
+    loadTrendAlert();
+  }, [overall, sessionDate, supabase, userId]);
 
   const handleDone = () => {
     router.replace('/(tabs)');
@@ -101,6 +175,12 @@ export default function CheckInConfirmationScreen() {
         <Text style={styles.subtitle}>
           {selectedIntensity} {selectedLift} Session
         </Text>
+
+        {trendAlert ? (
+          <View style={[styles.trendAlert, { borderColor: `${trendAlert.color}4D` }]}>
+            <Text style={[styles.trendAlertText, { color: trendAlert.color }]}>{trendAlert.message}</Text>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -248,6 +328,20 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginBottom: 32,
+  },
+  trendAlert: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    marginBottom: 16,
+  },
+  trendAlertText: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   scoreCard: {
     padding: 24,
