@@ -1,6 +1,13 @@
 import { CoachEmailSheet } from '@/components/CoachEmailSheet';
 import { colors } from '@/constants/colors';
 import { useHome } from '@/hooks/use-home';
+import {
+  trackCustomerCenterViewed,
+  trackCustomerSupportAccessed,
+  trackFeedbackSubmitted,
+  trackScreenView,
+  trackSettingsViewed,
+} from '@/utils/analytics';
 import { createAndShareCSV } from '@/utils/csvExport';
 import { useAuth } from '@clerk/clerk-expo';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -20,13 +27,6 @@ import {
 } from 'react-native';
 import RevenueCatUI from 'react-native-purchases-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  trackCustomerCenterViewed,
-  trackCustomerSupportAccessed,
-  trackFeedbackSubmitted,
-  trackScreenView,
-  trackSettingsViewed,
-} from '@/utils/analytics';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
@@ -204,6 +204,24 @@ export default function SettingsScreen() {
                 await SecureStore.setItemAsync(`forceOnboarding_${userId}`, 'true');
                 await SecureStore.deleteItemAsync(`hasSeenOnboarding_${userId}`);
                 router.replace('/(onboarding)');
+              }}
+            />
+            <SettingsRow
+              icon="check-circle"
+              title="Check-In Confirmation"
+              accentColor={colors.scoreGreen}
+              isDark={isDark}
+              onPress={() => {
+                router.push({
+                  pathname: '/check-in/confirmation',
+                  params: {
+                    overallScore: '82',
+                    physicalScore: '78',
+                    mentalScore: '86',
+                    selectedLift: 'Squat',
+                    selectedIntensity: 'Heavy',
+                  },
+                });
               }}
             />
           </>

@@ -1,10 +1,13 @@
 import { colors } from '@/constants/colors';
+import { trackContentShared } from '@/utils/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import React, { useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { captureRef } from 'react-native-view-shot';
 
 export default function CheckInConfirmationScreen() {
   const colorScheme = useColorScheme();
@@ -38,9 +41,43 @@ export default function CheckInConfirmationScreen() {
   };
 
   const overallColor = getScoreColor(overall);
+  const [isSharingImage, setIsSharingImage] = useState(false);
+  const shareCardRef = useRef<View>(null);
 
   const handleDone = () => {
     router.replace('/(tabs)');
+  };
+
+  const handleShareImage = async () => {
+    if (!shareCardRef.current || isSharingImage) return;
+    setIsSharingImage(true);
+
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Sharing unavailable', 'Sharing is not available on this device.');
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const uri = await captureRef(shareCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share Results',
+        UTI: 'public.png',
+      });
+
+      trackContentShared('Check-Ins', 'share_image');
+    } catch (error) {
+      console.error('Error sharing image:', error);
+    } finally {
+      setIsSharingImage(false);
+    }
   };
 
   return (
@@ -130,6 +167,12 @@ export default function CheckInConfirmationScreen() {
 
         <View style={styles.spacer} />
 
+        <Pressable style={styles.shareButton} onPress={handleShareImage}>
+          <Text style={[styles.shareButtonText, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+            Share Results
+          </Text>
+        </Pressable>
+
         <Pressable style={styles.doneButton} onPress={handleDone}>
           <LinearGradient
             colors={[colors.blueEnergy, `${colors.blueEnergy}D9`]}
@@ -140,6 +183,35 @@ export default function CheckInConfirmationScreen() {
             <Text style={styles.doneText}>Done</Text>
           </LinearGradient>
         </Pressable>
+      </View>
+
+      <View style={styles.shareCardCanvas} pointerEvents="none">
+        <View collapsable={false} ref={shareCardRef} style={styles.shareCardWrapper}>
+          <LinearGradient
+            colors={['rgba(20,20,20,0.92)', 'rgba(38,38,38,0.92)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.shareCard}
+          >
+            <Text style={styles.shareCardTitle}>Check-In Results</Text>
+            <Text style={styles.shareCardSubtitle}>
+              {selectedIntensity} {selectedLift} Session
+            </Text>
+            <View style={styles.shareCardStats}>
+              {[
+                { label: 'Overall', value: `${overall}%` },
+                { label: 'Physical', value: `${physical}%` },
+                { label: 'Mental', value: `${mental}%` },
+              ].map((stat) => (
+                <View key={stat.label} style={styles.shareCardStat}>
+                  <Text style={styles.shareCardStatValue}>{stat.value}</Text>
+                  <Text style={styles.shareCardStatLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.shareCardFooter}>Forge • Performance Journal</Text>
+          </LinearGradient>
+        </View>
       </View>
     </View>
   );
@@ -248,5 +320,74 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  shareButton: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  shareButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  shareCardCanvas: {
+    position: 'absolute',
+    left: -9999,
+    top: 0,
+  },
+  shareCardWrapper: {
+    backgroundColor: 'transparent',
+    padding: 0,
+  },
+  shareCard: {
+    width: 280,
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  shareCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareCardSubtitle: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  shareCardStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 6,
+  },
+  shareCardStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  shareCardStatValue: {
+    color: colors.gold,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareCardStatLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  shareCardFooter: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
 });
