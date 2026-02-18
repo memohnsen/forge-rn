@@ -7,7 +7,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from "react-native";
 
@@ -29,8 +28,6 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
   onPress,
 }) => {
   const disabled = !isEnabled || isLoading;
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
 
   return (
     <View style={styles.container}>
@@ -64,10 +61,10 @@ export const FormSubmitButton: React.FC<FormSubmitButtonProps> = ({
               <Ionicons
                 name={icon}
                 size={18}
-                color={isDark ? "#000000" : "#FFFFFF"}
+                color="#FFFFFF"
               />
               <Text
-                style={[styles.text, { color: isDark ? "#000000" : "#FFFFFF" }]}
+                style={[styles.text, { color: "#FFFFFF" }]}
               >
                 {title}
               </Text>

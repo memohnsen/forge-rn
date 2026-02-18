@@ -134,8 +134,8 @@ export default function OnboardingScreen() {
 
   const { data, currentPage, updateData, nextPage, prevPage, totalPages } = useOnboarding();
 
-  // Monochrome accent for question pages (matches OnboardingQuestionPage style)
-  const monoAccent = isDark ? '#FFFFFF' : '#000000';
+  // Accent color for question pages — matches the app's primary theme color
+  const monoAccent = colors.blueEnergy;
 
   const [isLoading, setIsLoading] = useState(false);
   const [setupProgress, setSetupProgress] = useState(0);

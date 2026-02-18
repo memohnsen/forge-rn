@@ -47,7 +47,7 @@ export const OnboardingQuestionPage: React.FC<OnboardingQuestionPageProps> = ({
       {/* Header: Back button + Progress bar */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.backButton} onPress={onBack} hitSlop={12}>
-          <Ionicons name="chevron-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+          <Ionicons name="chevron-back" size={24} color={colors.blueEnergy} />
         </Pressable>
 
         <View style={styles.progressBarContainer}>
@@ -59,7 +59,7 @@ export const OnboardingQuestionPage: React.FC<OnboardingQuestionPageProps> = ({
                 {
                   backgroundColor:
                     index < currentStep
-                      ? isDark ? '#FFFFFF' : '#000000'
+                      ? colors.blueEnergy
                       : isDark ? '#333333' : '#DDDDDD',
                 },
               ]}
@@ -98,7 +98,7 @@ export const OnboardingQuestionPage: React.FC<OnboardingQuestionPageProps> = ({
           icon="arrow-forward"
           isLoading={false}
           isEnabled={isValid}
-          accentColor={isDark ? '#FFFFFF' : '#000000'}
+          accentColor={colors.blueEnergy}
           onPress={onNext}
         />
       </View>

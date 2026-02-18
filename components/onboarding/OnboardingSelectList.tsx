@@ -1,3 +1,4 @@
+import { colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
@@ -28,7 +29,7 @@ export const OnboardingSelectList: React.FC<OnboardingSelectListProps> = ({
               {
                 backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF',
                 borderColor: isSelected
-                  ? isDark ? '#FFFFFF' : '#000000'
+                  ? colors.blueEnergy
                   : isDark ? '#2A2A2A' : '#E8E8E8',
                 borderWidth: isSelected ? 2 : 1,
               },
@@ -52,8 +53,8 @@ export const OnboardingSelectList: React.FC<OnboardingSelectListProps> = ({
                 styles.checkbox,
                 isSelected
                   ? {
-                      backgroundColor: isDark ? '#FFFFFF' : '#000000',
-                      borderColor: isDark ? '#FFFFFF' : '#000000',
+                      backgroundColor: colors.blueEnergy,
+                      borderColor: colors.blueEnergy,
                     }
                   : {
                       backgroundColor: 'transparent',
@@ -65,7 +66,7 @@ export const OnboardingSelectList: React.FC<OnboardingSelectListProps> = ({
                 <Ionicons
                   name="checkmark"
                   size={14}
-                  color={isDark ? '#000000' : '#FFFFFF'}
+                  color="#FFFFFF"
                 />
               )}
             </View>
