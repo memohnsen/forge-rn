@@ -1,4 +1,6 @@
 import { trackElevenLabsAPICall } from '@/utils/analytics';
+import { convexClient } from '@/app/_layout';
+import { api } from '@/convex/_generated/api';
 
 export type VoiceOption = {
   id: string;
@@ -15,21 +17,12 @@ export const VOICES: VoiceOption[] = [
 type TextToSpeechParams = {
   text: string;
   voiceId: string;
-  token: string;
+  token?: string;
   stability?: number;
   similarityBoost?: number;
 };
 
-const getEdgeFunctionUrl = () => {
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) {
-    throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL');
-  }
-  return `${supabaseUrl}/functions/v1/elevenlabs`;
-};
-
 function processSSMLBreaks(text: string): string {
-  // Convert SSML break tags to pause markers for ElevenLabs
   const breakPattern = /<break\s+time="(\d+\.?\d*)s"\s*\/>/g;
 
   return text.replace(breakPattern, (_, seconds) => {
@@ -44,46 +37,46 @@ function processSSMLBreaks(text: string): string {
   });
 }
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
 export async function textToSpeech({
   text,
   voiceId,
-  token,
   stability = 0.5,
   similarityBoost = 0.75,
 }: TextToSpeechParams): Promise<ArrayBuffer> {
-  const requestUrl = getEdgeFunctionUrl();
   const processedText = processSSMLBreaks(text);
   const textLength = text.length;
 
   try {
-    const response = await fetch(requestUrl, {
+    const result = await convexClient.action(api.actions.elevenlabsProxy.proxyRequest, {
+      endpoint: `/text-to-speech/${voiceId}`,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        endpoint: `/text-to-speech/${voiceId}`,
-        method: 'POST',
-        body: {
-          text: processedText,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability,
-            similarity_boost: similarityBoost,
-            style: 0.0,
-            use_speaker_boost: true,
-          },
+      body: {
+        text: processedText,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability,
+          similarity_boost: similarityBoost,
+          style: 0.0,
+          use_speaker_boost: true,
         },
-      }),
+      },
+      responseType: 'base64',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ElevenLabs error (${response.status}): ${errorText || 'Unknown error'}`);
+    if (result.type !== 'base64') {
+      throw new Error('ElevenLabs: expected base64 audio response');
     }
 
-    const audio = await response.arrayBuffer();
+    const audio = base64ToArrayBuffer(result.data as string);
     trackElevenLabsAPICall(voiceId, textLength, null, true);
     return audio;
   } catch (error) {

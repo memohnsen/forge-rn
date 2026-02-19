@@ -5,11 +5,13 @@ import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
 import { formatToISO } from '@/utils/dateFormatter';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -37,16 +39,16 @@ export default function CheckInScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const { getToken, userId } = useAuth();
+  const { userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isEditMode = Boolean(editId);
-  const editItemId = Number(editId ?? 0);
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
-    });
-  }, [getToken]);
+  const upsertForDate = useMutation(api.dailyCheckIns.upsertForDate);
+  const patchById = useMutation(api.dailyCheckIns.patchById);
+  const existingCheckIn = useQuery(
+    api.dailyCheckIns.getById,
+    isEditMode && editId ? { id: editId as Id<'dailyCheckIns'> } : 'skip'
+  );
 
   // Form state
   const [sessionDate, setSessionDate] = useState(new Date());
@@ -72,7 +74,7 @@ export default function CheckInScreen() {
 
   const [concerns, setConcerns] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const isHydratingEditState = isEditMode && existingCheckIn === undefined;
   const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -81,59 +83,34 @@ export default function CheckInScreen() {
   }, []);
 
   React.useEffect(() => {
-    const hydrateEditState = async () => {
-      if (!isEditMode) {
-        setIsHydratingEditState(false);
-        return;
-      }
-      if (hasHydratedEditStateRef.current) return;
-      if (!userId || !editItemId) return;
+    if (!isEditMode || hasHydratedEditStateRef.current) return;
+    if (existingCheckIn === undefined) return;
 
-      hasHydratedEditStateRef.current = true;
-      setIsHydratingEditState(true);
-      try {
-        const { data, error } = await supabase
-          .from('journal_daily_checkins')
-          .select('*')
-          .eq('id', editItemId)
-          .eq('user_id', userId)
-          .maybeSingle();
+    if (existingCheckIn === null) {
+      Alert.alert('Entry not found', 'Unable to load this check-in.');
+      router.back();
+      return;
+    }
 
-        if (error) throw error;
-        if (!data) {
-          Alert.alert('Entry not found', 'Unable to load this check-in.');
-          router.back();
-          return;
-        }
-
-        setSessionDate(new Date(data.check_in_date));
-        setSelectedLift(data.selected_lift ?? 'Squat');
-        setSelectedIntensity(data.selected_intensity ?? 'Moderate');
-        setGoal(data.goal ?? '');
-        setPhysicalStrength(data.physical_strength ?? 3);
-        setMentalStrength(data.mental_strength ?? 3);
-        setRecovered(data.recovered ?? 3);
-        setConfidence(data.confidence ?? 3);
-        setSleep(data.sleep ?? 3);
-        setEnergy(data.energy ?? 3);
-        setStress(data.stress ?? 3);
-        setSoreness(data.soreness ?? 3);
-        setReadiness(data.readiness ?? 3);
-        setFocus(data.focus ?? 3);
-        setExcitement(data.excitement ?? 3);
-        setBodyConnection(data.body_connection ?? 3);
-        setConcerns(data.concerns ?? '');
-      } catch (err) {
-        console.error('Error loading check-in for edit:', err);
-        Alert.alert('Unable to load entry', 'Please try again.');
-        router.back();
-      } finally {
-        setIsHydratingEditState(false);
-      }
-    };
-
-    hydrateEditState();
-  }, [editItemId, isEditMode, router, supabase, userId]);
+    hasHydratedEditStateRef.current = true;
+    setSessionDate(new Date(existingCheckIn.checkInDate));
+    setSelectedLift(existingCheckIn.selectedLift ?? 'Squat');
+    setSelectedIntensity(existingCheckIn.selectedIntensity ?? 'Moderate');
+    setGoal(existingCheckIn.goal ?? '');
+    setPhysicalStrength(existingCheckIn.physicalStrength ?? 3);
+    setMentalStrength(existingCheckIn.mentalStrength ?? 3);
+    setRecovered(existingCheckIn.recovered ?? 3);
+    setConfidence(existingCheckIn.confidence ?? 3);
+    setSleep(existingCheckIn.sleep ?? 3);
+    setEnergy(existingCheckIn.energy ?? 3);
+    setStress(existingCheckIn.stress ?? 3);
+    setSoreness(existingCheckIn.soreness ?? 3);
+    setReadiness(existingCheckIn.readiness ?? 3);
+    setFocus(existingCheckIn.focus ?? 3);
+    setExcitement(existingCheckIn.excitement ?? 3);
+    setBodyConnection(existingCheckIn.bodyConnection ?? 3);
+    setConcerns(existingCheckIn.concerns ?? '');
+  }, [isEditMode, existingCheckIn, router]);
 
   // Calculate scores
   const physicalScore = Math.round(
@@ -165,13 +142,15 @@ export default function CheckInScreen() {
 
     setIsLoading(true);
     try {
+      const checkInDate = formatToISO(sessionDate);
       const payload = {
-        check_in_date: formatToISO(sessionDate),
-        selected_lift: selectedLift,
-        selected_intensity: selectedIntensity,
+        userId,
+        checkInDate,
+        selectedLift,
+        selectedIntensity,
         goal,
-        physical_strength: physicalStrength,
-        mental_strength: mentalStrength,
+        physicalStrength,
+        mentalStrength,
         recovered,
         confidence,
         sleep,
@@ -181,27 +160,17 @@ export default function CheckInScreen() {
         readiness,
         focus,
         excitement,
-        body_connection: bodyConnection,
-        concerns,
-        physical_score: physicalScore,
-        mental_score: mentalScore,
-        overall_score: overallScore,
+        bodyConnection,
+        concerns: concerns || undefined,
+        physicalScore,
+        mentalScore,
+        overallScore,
       };
 
-      const { error } = isEditMode
-        ? await supabase
-            .from('journal_daily_checkins')
-            .update(payload)
-            .eq('id', editItemId)
-            .eq('user_id', userId)
-        : await supabase.from('journal_daily_checkins').insert({
-            ...payload,
-            user_id: userId,
-            created_at: new Date().toISOString(),
-          });
-
-      if (error) {
-        throw error;
+      if (isEditMode && editId) {
+        await patchById({ id: editId as Id<'dailyCheckIns'>, ...payload });
+      } else {
+        await upsertForDate(payload);
       }
 
       trackCheckInSubmitted(selectedLift, selectedIntensity, overallScore);
@@ -212,7 +181,7 @@ export default function CheckInScreen() {
             onPress: () =>
               router.replace({
                 pathname: '/history/[id]',
-                params: { id: String(editItemId), type: 'Check-Ins' },
+                params: { id: editId, type: 'Check-Ins' },
               }),
           },
         ]);
@@ -225,7 +194,7 @@ export default function CheckInScreen() {
             mentalScore: mentalScore.toString(),
             selectedLift,
             selectedIntensity,
-            sessionDate: payload.check_in_date,
+            sessionDate: checkInDate,
           },
         });
       }

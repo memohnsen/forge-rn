@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-expo';
-import { createClerkSupabaseClient } from '@/services/supabase';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { notificationManager, TrainingDays } from '@/utils/notificationManager';
 import {
   trackNotificationEnabled,
@@ -11,7 +12,7 @@ import {
 } from '@/utils/analytics';
 
 export function useNotifications() {
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const [trainingDays, setTrainingDays] = useState<TrainingDays>({});
   const [isEnabled, setIsEnabled] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
@@ -19,23 +20,19 @@ export function useNotifications() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const trainingDaysRef = useRef(trainingDays);
-  const meetDataRef = useRef<{ meetDate?: string; meetName?: string }>({});
-  const getTokenRef = useRef(getToken);
+  const meetDataRef = { current: {} as { meetDate?: string; meetName?: string } };
 
+  // Convex reactive query and mutation
+  const convexUser = useQuery(api.users.getByUserId, userId ? { userId } : 'skip');
+  const convexUpdateTrainingDays = useMutation(api.users.updateTrainingDays);
+
+  // Sync training days from Convex when user data loads
   useEffect(() => {
-    trainingDaysRef.current = trainingDays;
-  }, [trainingDays]);
-
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
-
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getTokenRef.current({ template: 'supabase', skipCache: true });
-    });
-  }, []);
+    if (convexUser && convexUser.trainingDays) {
+      setTrainingDays(convexUser.trainingDays as TrainingDays);
+      notificationManager.storeTrainingDays(convexUser.trainingDays as TrainingDays).catch(() => {});
+    }
+  }, [convexUser]);
 
   const refreshPermission = useCallback(async () => {
     const permission = await notificationManager.checkPermission();
@@ -46,7 +43,6 @@ export function useNotifications() {
   const loadStoredSettings = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-
     try {
       const [enabled, storedTrainingDays, storedMeetData] = await Promise.all([
         notificationManager.getEnabled(),
@@ -64,35 +60,12 @@ export function useNotifications() {
     }
   }, [refreshPermission]);
 
-  const loadTrainingDaysFromDb = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('journal_users')
-        .select('training_days')
-        .eq('user_id', userId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      if (data?.training_days) {
-        setTrainingDays(data.training_days);
-        trainingDaysRef.current = data.training_days;
-        await notificationManager.storeTrainingDays(data.training_days);
-      }
-    } catch (err) {
-      setError(err as Error);
-    }
-  }, [supabase, userId]);
-
   const updateMeetData = useCallback(async (meetDate?: string, meetName?: string) => {
     if (!meetDate || !meetName) {
       meetDataRef.current = {};
       await notificationManager.clearMeetData();
       return;
     }
-
     meetDataRef.current = { meetDate, meetName };
     await notificationManager.storeMeetData(meetDate, meetName);
   }, []);
@@ -101,11 +74,11 @@ export function useNotifications() {
     const { meetDate, meetName } = meetDataRef.current;
     await notificationManager.scheduleNotifications({
       enabled: true,
-      trainingDays: trainingDaysRef.current,
+      trainingDays,
       meetDate,
       meetName,
     });
-  }, []);
+  }, [trainingDays]);
 
   const rescheduleNotifications = useCallback(async () => {
     if (!isEnabled) return;
@@ -149,18 +122,10 @@ export function useNotifications() {
       setError(null);
 
       try {
-        const { error: updateError } = await supabase
-          .from('journal_users')
-          .update({
-            training_days: newTrainingDays,
-          })
-          .eq('user_id', userId);
-
-        if (updateError) throw updateError;
+        await convexUpdateTrainingDays({ userId, trainingDays: newTrainingDays });
 
         await notificationManager.storeTrainingDays(newTrainingDays);
         setTrainingDays(newTrainingDays);
-        trainingDaysRef.current = newTrainingDays;
         trackNotificationTrainingDaysUpdated(Object.keys(newTrainingDays).length);
 
         if (isEnabled) {
@@ -175,16 +140,12 @@ export function useNotifications() {
         setIsSaving(false);
       }
     },
-    [isEnabled, scheduleAll, supabase, userId]
+    [isEnabled, scheduleAll, userId, convexUpdateTrainingDays]
   );
 
   useEffect(() => {
     loadStoredSettings();
   }, [loadStoredSettings]);
-
-  useEffect(() => {
-    loadTrainingDaysFromDb();
-  }, [loadTrainingDaysFromDb]);
 
   return {
     trainingDays,

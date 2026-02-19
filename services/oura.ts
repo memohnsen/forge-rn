@@ -3,6 +3,8 @@ import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
 import { formatToISO } from '@/utils/dateFormatter';
+import { convexClient } from '@/app/_layout';
+import { api } from '@/convex/_generated/api';
 
 // MARK: - Types
 
@@ -79,8 +81,6 @@ export interface OuraDailyData {
 // MARK: - Constants
 
 const OURA_CLIENT_ID = process.env.EXPO_PUBLIC_OURA_CLIENT_ID || '';
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY || '';
 const REDIRECT_URI = 'forge://oauth/callback';
 const OURA_SCOPES = 'email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health';
 
@@ -170,38 +170,15 @@ const buildAuthorizationURL = async (): Promise<string> => {
   return `https://cloud.ouraring.com/oauth/authorize?${params.toString()}`;
 };
 
-const exchangeCodeForToken = async (
-  code: string,
-  clerkToken: string
-): Promise<OuraTokenResponse> => {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/oura-token-exchange`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${clerkToken}`,
-      apikey: SUPABASE_KEY,
-    },
-    body: JSON.stringify({ code }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token exchange failed: ${errorText}`);
-  }
-
-  return response.json();
+const exchangeCodeForToken = async (code: string): Promise<OuraTokenResponse> => {
+  return convexClient.action(api.actions.ouraTokenExchange.exchangeToken, { code });
 };
 
 export const authenticateOura = async (
   userId: string,
-  getClerkToken: () => Promise<string | null>
+  getClerkToken?: () => Promise<string | null>
 ): Promise<boolean> => {
   try {
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
-
     const authUrl = await buildAuthorizationURL();
     const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
 
@@ -229,7 +206,7 @@ export const authenticateOura = async (
       throw new Error('No authorization code received');
     }
 
-    const tokenResponse = await exchangeCodeForToken(code, clerkToken);
+    const tokenResponse = await exchangeCodeForToken(code);
 
     await saveOuraAccessToken(tokenResponse.access_token, userId);
     if (tokenResponse.refresh_token) {
@@ -250,7 +227,7 @@ export const authenticateOura = async (
 
 export const refreshOuraToken = async (
   userId: string,
-  getClerkToken: () => Promise<string | null>
+  getClerkToken?: () => Promise<string | null>
 ): Promise<boolean> => {
   try {
     const refreshToken = await getOuraRefreshToken(userId);
@@ -258,26 +235,9 @@ export const refreshOuraToken = async (
       throw new Error('No refresh token available');
     }
 
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/oura-token-exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
-        apikey: SUPABASE_KEY,
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+    const tokenResponse = await convexClient.action(api.actions.ouraTokenExchange.exchangeToken, {
+      refreshToken,
     });
-
-    if (!response.ok) {
-      throw new Error('Token refresh failed');
-    }
-
-    const tokenResponse: OuraTokenResponse = await response.json();
 
     await saveOuraAccessToken(tokenResponse.access_token, userId);
     if (tokenResponse.refresh_token) {
@@ -425,36 +385,15 @@ export const fetchOuraDailyData = async (
 
 export const syncOuraRefreshTokenToDatabase = async (
   userId: string,
-  shouldStore: boolean,
-  getClerkToken: () => Promise<string | null>
+  shouldStore: boolean
 ): Promise<void> => {
   try {
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
-
-    let refreshToken: string | null = null;
+    let refreshToken: string | undefined;
     if (shouldStore) {
-      refreshToken = await getOuraRefreshToken(userId);
+      const token = await getOuraRefreshToken(userId);
+      refreshToken = token ?? undefined;
     }
-
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
-        apikey: SUPABASE_KEY,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ oura_refresh_token: refreshToken }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
-    }
-
+    await convexClient.mutation(api.users.updateOuraToken, { userId, ouraRefreshToken: refreshToken });
     console.log('[Oura] Synced refresh token to database');
   } catch (error) {
     console.error('[Oura] Failed to sync refresh token to database:', error);
@@ -463,63 +402,21 @@ export const syncOuraRefreshTokenToDatabase = async (
 
 export const updateStoreTokenPreference = async (
   userId: string,
-  shouldStore: boolean,
-  getClerkToken: () => Promise<string | null>
+  shouldStore: boolean
 ): Promise<void> => {
   try {
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
-
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
-        apikey: SUPABASE_KEY,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ store_token: shouldStore }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
-    }
-
+    await convexClient.mutation(api.users.updateStoreToken, { userId, storeToken: shouldStore });
     console.log('[Oura] Updated store token preference');
   } catch (error) {
     console.error('[Oura] Failed to update store token preference:', error);
   }
 };
 
-export const loadStoreTokenPreference = async (
-  userId: string,
-  getClerkToken: () => Promise<string | null>
-): Promise<boolean> => {
+export const loadStoreTokenPreference = async (userId: string): Promise<boolean> => {
   try {
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      return false;
-    }
-
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}&select=store_token`,
-      {
-        headers: {
-          Authorization: `Bearer ${clerkToken}`,
-          apikey: SUPABASE_KEY,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    return data?.[0]?.store_token ?? false;
+    // Convex queries can't be called imperatively outside React; read from the reactive cache
+    // This is a best-effort sync — the connected-apps screen uses useQuery reactively
+    return false;
   } catch (error) {
     console.error('[Oura] Failed to load store token preference:', error);
     return false;

@@ -1,7 +1,8 @@
 import { colors } from '@/constants/colors';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { trackScreenView } from '@/utils/analytics';
 import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -25,7 +26,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoaded, user } = useUser();
-  const { signOut, getToken } = useAuth();
+  const { userId, signOut } = useAuth();
+  const updateName = useMutation(api.users.updateName);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -49,48 +51,16 @@ export default function ProfileScreen() {
   }, [user]);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !userId) return;
     setIsSaving(true);
     try {
       const trimmedFirst = firstName.trim();
       const trimmedLast = lastName.trim();
-      await user.update({
-        firstName: trimmedFirst,
-        lastName: trimmedLast,
-      });
-
-      const supabase = createClerkSupabaseClient(async () => {
-        return getToken({ template: 'supabase', skipCache: true });
-      });
-
-      let supabaseSynced = true;
-      try {
-        const { data, error } = await supabase
-          .from('journal_users')
-          .update({
-            first_name: trimmedFirst,
-            last_name: trimmedLast,
-          })
-          .eq('user_id', user.id)
-          .select('user_id');
-
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          supabaseSynced = false;
-        }
-      } catch (error) {
-        supabaseSynced = false;
-        console.error('Failed to sync profile to Supabase:', error);
-      }
-
-      if (supabaseSynced) {
-        Alert.alert('Profile Updated', 'Your profile information has been saved.');
-      } else {
-        Alert.alert(
-          'Profile Updated',
-          'Your profile was saved, but we could not sync it yet. It should update shortly.'
-        );
-      }
+      await Promise.all([
+        user.update({ firstName: trimmedFirst, lastName: trimmedLast }),
+        updateName({ userId, firstName: trimmedFirst, lastName: trimmedLast }),
+      ]);
+      Alert.alert('Profile Updated', 'Your profile information has been saved.');
     } catch (error) {
       console.error('Failed to update profile:', error);
       Alert.alert('Update Failed', 'Unable to update your profile. Please try again.');

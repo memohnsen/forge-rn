@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
-import { createClerkSupabaseClient } from '@/services/supabase';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { CompReport } from '@/models/Competition';
@@ -45,48 +46,37 @@ const buildSeries = <T,>(
 };
 
 const buildMeetTotal = (report: CompReport) => {
-  const wlTotal = toNumber(report.snatch_best) + toNumber(report.cj_best);
-  const plTotal =
-    toNumber(report.squat_best) + toNumber(report.bench_best) + toNumber(report.deadlift_best);
-
+  const wlTotal = toNumber(report.snatchBest) + toNumber(report.cjBest);
+  const plTotal = toNumber(report.squatBest) + toNumber(report.benchBest) + toNumber(report.deadliftBest);
   if (wlTotal > 0) return wlTotal;
   if (plTotal > 0) return plTotal;
   return 0;
 };
 
 export function useTrends() {
-  const { getToken, userId, isLoaded } = useAuth();
-  const getTokenRef = useRef(getToken);
+  const { userId, isLoaded } = useAuth();
   const isRefreshingRef = useRef(false);
 
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
+  // Convex reactive queries
+  const convexCheckIns = useQuery(api.dailyCheckIns.listByUser, userId ? { userId } : 'skip');
+  const convexSessions = useQuery(api.sessionReports.listByUser, userId ? { userId } : 'skip');
+  const convexComps = useQuery(api.compReports.listByUser, userId ? { userId } : 'skip');
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getTokenRef.current({ template: 'supabase', skipCache: true });
-    });
-  }, []);
+  const checkIns = (convexCheckIns as CheckIn[] | undefined) ?? [];
+  const sessionReports = (convexSessions as SessionReport[] | undefined) ?? [];
+  const compReports = (convexComps as CompReport[] | undefined) ?? [];
 
-  const getClerkToken = useCallback(async () => {
-    try {
-      return await getTokenRef.current({ template: 'supabase' });
-    } catch (error) {
-      console.warn('[useTrends] Failed to get Clerk token:', error);
-      return null;
-    }
-  }, []);
-
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
-  const [compReports, setCompReports] = useState<CompReport[]>([]);
   const [ouraData, setOuraData] = useState<OuraDailyData[]>([]);
   const [whoopData, setWhoopData] = useState<WhoopDailyData[]>([]);
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  const convexLoading =
+    convexCheckIns === undefined ||
+    convexSessions === undefined ||
+    convexComps === undefined;
 
   const refresh = useCallback(async () => {
     if (!isLoaded || !userId || isRefreshingRef.current) {
@@ -102,50 +92,20 @@ export function useTrends() {
     isRefreshingRef.current = true;
 
     try {
-      // Fetch Supabase data
-      const [checkInsResponse, sessionsResponse, compsResponse] = await Promise.all([
-        supabase
-          .from('journal_daily_checkins')
-          .select('*')
-          .eq('user_id', userId)
-          .order('check_in_date', { ascending: false }),
-        supabase
-          .from('journal_session_report')
-          .select('*')
-          .eq('user_id', userId)
-          .order('session_date', { ascending: false }),
-        supabase
-          .from('journal_comp_report')
-          .select('*')
-          .eq('user_id', userId)
-          .order('meet_date', { ascending: false }),
-      ]);
-
-      if (checkInsResponse.error) throw checkInsResponse.error;
-      if (sessionsResponse.error) throw sessionsResponse.error;
-      if (compsResponse.error) throw compsResponse.error;
-
-      setCheckIns(checkInsResponse.data || []);
-      setSessionReports(sessionsResponse.data || []);
-      setCompReports(compsResponse.data || []);
-
-      // Fetch wearable data if connected (last 90 days)
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
       const [ouraConnectedResult, whoopConnectedResult] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId, getClerkToken),
+        isWhoopConnected(userId),
       ]);
       setOuraConnected(ouraConnectedResult);
       setWhoopConnected(whoopConnectedResult);
 
-      // Fetch Oura data if connected
       if (ouraConnectedResult) {
         try {
           const ouraResult = await fetchOuraDailyData(userId, ninetyDaysAgo);
           setOuraData(ouraResult);
-          console.log(`[useTrends] Fetched ${ouraResult.length} Oura records`);
         } catch (ouraError) {
           console.warn('[useTrends] Failed to fetch Oura data:', ouraError);
           setOuraData([]);
@@ -154,12 +114,10 @@ export function useTrends() {
         setOuraData([]);
       }
 
-      // Fetch Whoop data if connected
       if (whoopConnectedResult) {
         try {
-          const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo, undefined, getClerkToken);
+          const whoopResult = await fetchWhoopDailyData(userId, ninetyDaysAgo);
           setWhoopData(whoopResult);
-          console.log(`[useTrends] Fetched ${whoopResult.length} Whoop records`);
         } catch (whoopError) {
           console.warn('[useTrends] Failed to fetch Whoop data:', whoopError);
           setWhoopData([]);
@@ -169,16 +127,14 @@ export function useTrends() {
       }
     } catch (err) {
       const error =
-        err instanceof Error
-          ? err
-          : new Error(typeof err === 'string' ? err : 'Unknown trends error');
+        err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'Unknown trends error');
       console.error('[useTrends] Error fetching trends data:', err);
       setError(error);
     } finally {
       isRefreshingRef.current = false;
       setIsLoading(false);
     }
-  }, [supabase, userId, isLoaded]);
+  }, [userId, isLoaded]);
 
   useEffect(() => {
     if (isLoaded && userId) {
@@ -186,97 +142,104 @@ export function useTrends() {
     }
   }, [userId, isLoaded, refresh]);
 
+  // Once convex data loads, stop showing loading
+  useEffect(() => {
+    if (!convexLoading) {
+      setIsLoading(false);
+    }
+  }, [convexLoading]);
+
   const dataByChartId = useMemo<Record<string, TrendPoint[]>>(() => {
     return {
-      // Check-in charts
-      checkin_overall: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.overall_score),
-      checkin_physical: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.physical_score),
-      checkin_mental: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.mental_score),
-      checkin_physical_strength: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.physical_strength),
-      checkin_mental_strength: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.mental_strength),
-      checkin_recovery: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.recovered),
-      checkin_confidence: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.confidence),
-      checkin_sleep: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.sleep),
-      checkin_energy: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.energy),
-      checkin_stress: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.stress),
-      checkin_soreness: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.soreness),
-      checkin_readiness: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.readiness),
-      checkin_focus: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.focus),
-      checkin_excitement: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.excitement),
-      checkin_body_connection: buildSeries(checkIns, (item) => item.check_in_date, (item) => item.body_connection),
+      // Check-in charts — camelCase field names from Convex
+      checkin_overall: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.overallScore),
+      checkin_physical: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.physicalScore),
+      checkin_mental: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.mentalScore),
+      checkin_physical_strength: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.physicalStrength),
+      checkin_mental_strength: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.mentalStrength),
+      checkin_recovery: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.recovered),
+      checkin_confidence: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.confidence),
+      checkin_sleep: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.sleep),
+      checkin_energy: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.energy),
+      checkin_stress: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.stress),
+      checkin_soreness: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.soreness),
+      checkin_readiness: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.readiness),
+      checkin_focus: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.focus),
+      checkin_excitement: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.excitement),
+      checkin_body_connection: buildSeries(checkIns, (i) => i.checkInDate, (i) => i.bodyConnection),
       // Workout charts
-      workout_rpe: buildSeries(sessionReports, (item) => item.session_date, (item) => item.session_rpe),
-      workout_quality: buildSeries(sessionReports, (item) => item.session_date, (item) => item.movement_quality),
-      workout_focus: buildSeries(sessionReports, (item) => item.session_date, (item) => item.focus),
-      workout_misses: buildSeries(sessionReports, (item) => item.session_date, (item) => toNumber(item.misses)),
-      workout_feeling: buildSeries(sessionReports, (item) => item.session_date, (item) => item.feeling),
-      workout_satisfaction: buildSeries(sessionReports, (item) => item.session_date, (item) => item.satisfaction),
-      workout_confidence: buildSeries(sessionReports, (item) => item.session_date, (item) => item.confidence),
+      workout_rpe: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.sessionRpe),
+      workout_quality: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.movementQuality),
+      workout_focus: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.focus),
+      workout_misses: buildSeries(sessionReports, (i) => i.sessionDate, (i) => toNumber(i.misses)),
+      workout_feeling: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.feeling),
+      workout_satisfaction: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.satisfaction),
+      workout_confidence: buildSeries(sessionReports, (i) => i.sessionDate, (i) => i.confidence),
       // Meet charts
-      meet_performance: buildSeries(compReports, (item) => item.meet_date, (item) => item.performance_rating),
-      meet_physical_prep: buildSeries(compReports, (item) => item.meet_date, (item) => item.physical_preparedness_rating),
-      meet_mental_prep: buildSeries(compReports, (item) => item.meet_date, (item) => item.mental_preparedness_rating),
-      meet_total: buildSeries(compReports, (item) => item.meet_date, (item) => buildMeetTotal(item)),
-      meet_satisfaction: buildSeries(compReports, (item) => item.meet_date, (item) => item.satisfaction),
-      meet_confidence: buildSeries(compReports, (item) => item.meet_date, (item) => item.confidence),
-      meet_pressure: buildSeries(compReports, (item) => item.meet_date, (item) => item.pressure_handling),
-      meet_bodyweight: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.bodyweight)),
-      meet_snatch_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.snatch_best)),
-      meet_cj_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.cj_best)),
-      meet_squat_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.squat_best)),
-      meet_bench_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.bench_best)),
-      meet_deadlift_best: buildSeries(compReports, (item) => item.meet_date, (item) => toNumber(item.deadlift_best)),
+      meet_performance: buildSeries(compReports, (i) => i.meetDate, (i) => i.performanceRating),
+      meet_physical_prep: buildSeries(compReports, (i) => i.meetDate, (i) => i.physicalPreparednessRating),
+      meet_mental_prep: buildSeries(compReports, (i) => i.meetDate, (i) => i.mentalPreparednessRating),
+      meet_total: buildSeries(compReports, (i) => i.meetDate, (i) => buildMeetTotal(i)),
+      meet_satisfaction: buildSeries(compReports, (i) => i.meetDate, (i) => i.satisfaction),
+      meet_confidence: buildSeries(compReports, (i) => i.meetDate, (i) => i.confidence),
+      meet_pressure: buildSeries(compReports, (i) => i.meetDate, (i) => i.pressureHandling),
+      meet_bodyweight: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.bodyweight)),
+      meet_snatch_best: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.snatchBest)),
+      meet_cj_best: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.cjBest)),
+      meet_squat_best: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.squatBest)),
+      meet_bench_best: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.benchBest)),
+      meet_deadlift_best: buildSeries(compReports, (i) => i.meetDate, (i) => toNumber(i.deadliftBest)),
       // Oura charts
       oura_sleep: buildSeries(
-        ouraData.filter((item) => item.sleepDurationHours !== undefined),
-        (item) => item.date,
-        (item) => item.sleepDurationHours ?? 0
+        ouraData.filter((i) => i.sleepDurationHours !== undefined),
+        (i) => i.date,
+        (i) => i.sleepDurationHours ?? 0
       ),
       oura_hrv: buildSeries(
-        ouraData.filter((item) => item.hrv !== undefined),
-        (item) => item.date,
-        (item) => item.hrv ?? 0
+        ouraData.filter((i) => i.hrv !== undefined),
+        (i) => i.date,
+        (i) => i.hrv ?? 0
       ),
       oura_heart_rate: buildSeries(
-        ouraData.filter((item) => item.averageHeartRate !== undefined),
-        (item) => item.date,
-        (item) => item.averageHeartRate ?? 0
+        ouraData.filter((i) => i.averageHeartRate !== undefined),
+        (i) => i.date,
+        (i) => i.averageHeartRate ?? 0
       ),
       oura_readiness: buildSeries(
-        ouraData.filter((item) => item.readinessScore !== undefined),
-        (item) => item.date,
-        (item) => item.readinessScore ?? 0
+        ouraData.filter((i) => i.readinessScore !== undefined),
+        (i) => i.date,
+        (i) => i.readinessScore ?? 0
       ),
       // Whoop charts
       whoop_recovery: buildSeries(
-        whoopData.filter((item) => item.recoveryScore !== undefined),
-        (item) => item.date,
-        (item) => item.recoveryScore ?? 0
+        whoopData.filter((i) => i.recoveryScore !== undefined),
+        (i) => i.date,
+        (i) => i.recoveryScore ?? 0
       ),
       whoop_sleep: buildSeries(
-        whoopData.filter((item) => item.sleepDurationHours !== undefined),
-        (item) => item.date,
-        (item) => item.sleepDurationHours ?? 0
+        whoopData.filter((i) => i.sleepDurationHours !== undefined),
+        (i) => i.date,
+        (i) => i.sleepDurationHours ?? 0
       ),
       whoop_sleep_performance: buildSeries(
-        whoopData.filter((item) => item.sleepPerformance !== undefined),
-        (item) => item.date,
-        (item) => item.sleepPerformance ?? 0
+        whoopData.filter((i) => i.sleepPerformance !== undefined),
+        (i) => i.date,
+        (i) => i.sleepPerformance ?? 0
       ),
       whoop_strain: buildSeries(
-        whoopData.filter((item) => item.strainScore !== undefined),
-        (item) => item.date,
-        (item) => item.strainScore ?? 0
+        whoopData.filter((i) => i.strainScore !== undefined),
+        (i) => i.date,
+        (i) => i.strainScore ?? 0
       ),
       whoop_hrv: buildSeries(
-        whoopData.filter((item) => item.hrvMs !== undefined),
-        (item) => item.date,
-        (item) => item.hrvMs ?? 0
+        whoopData.filter((i) => i.hrvMs !== undefined),
+        (i) => i.date,
+        (i) => i.hrvMs ?? 0
       ),
       whoop_resting_hr: buildSeries(
-        whoopData.filter((item) => item.restingHeartRate !== undefined),
-        (item) => item.date,
-        (item) => item.restingHeartRate ?? 0
+        whoopData.filter((i) => i.restingHeartRate !== undefined),
+        (i) => i.date,
+        (i) => i.restingHeartRate ?? 0
       ),
     };
   }, [checkIns, sessionReports, compReports, ouraData, whoopData]);
@@ -295,7 +258,7 @@ export function useTrends() {
     categories,
     ouraConnected,
     whoopConnected,
-    isLoading,
+    isLoading: isLoading || convexLoading,
     error,
     refresh,
     checkIns,

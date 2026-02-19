@@ -26,8 +26,9 @@ import ReAnimated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, i
 import * as Haptics from 'expo-haptics';
 
 import { VoiceOption, VOICES } from '@/services/elevenlabs';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { generateVisualizationAudio } from '@/services/visualization-generation';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import {
   trackScreenView,
   trackVisualizationGenerated,
@@ -49,7 +50,6 @@ type VisualizationGenerationTiming = {
   source: GenerationSource;
   generationStartedAt: number;
   totalGenerationMs?: number;
-  tokenMs?: number;
   openRouterMs?: number;
   textToSpeechMs?: number;
   combinedRequestMs?: number;
@@ -57,13 +57,11 @@ type VisualizationGenerationTiming = {
   audioWriteMs?: number;
 };
 
-const PREFETCH_TOKEN_TTL_MS = 45_000;
-
 export default function VisualizationScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
 
   const [screenState, setScreenState] = useState<ScreenState>('setup');
   const [movement, setMovement] = useState('');
@@ -75,8 +73,6 @@ export default function VisualizationScreen() {
   const [generatedScript, setGeneratedScript] = useState('');
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [latestGenerationTiming, setLatestGenerationTiming] = useState<VisualizationGenerationTiming | null>(null);
-  const [prefetchedToken, setPrefetchedToken] = useState<string | null>(null);
-  const prefetchedTokenAtRef = useRef<number>(0);
 
   const [hasCachedVersion, setHasCachedVersion] = useState(false);
   const [useCachedVersion, setUseCachedVersion] = useState(false);
@@ -85,28 +81,13 @@ export default function VisualizationScreen() {
   const canGenerate =
     movement.trim().length > 0 && cues.trim().length > 0;
 
-  // Load user sport from Supabase
+  // Load user sport from Convex
+  const convexUser = useQuery(api.users.getByUserId, userId ? { userId } : 'skip');
   useEffect(() => {
-    async function loadUserSport() {
-      if (!userId) return;
-      try {
-        const token = await getToken({ template: 'supabase' });
-        if (!token) return;
-        const supabase = createClerkSupabaseClient(() => Promise.resolve(token));
-        const { data } = await supabase
-          .from('journal_users')
-          .select('sport')
-          .eq('user_id', userId)
-          .single();
-        if (data?.sport) {
-          setUserSport(data.sport);
-        }
-      } catch (error) {
-        console.log('Failed to load user sport:', error);
-      }
+    if (convexUser?.sport) {
+      setUserSport(convexUser.sport);
     }
-    loadUserSport();
-  }, [userId, getToken]);
+  }, [convexUser?.sport]);
 
   useEffect(() => {
     if (!hasTrackedScreen.current) {
@@ -115,28 +96,6 @@ export default function VisualizationScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function prefetchToken() {
-      if (!userId || screenState !== 'setup') return;
-
-      try {
-        const token = await getToken({ template: 'supabase' });
-        if (cancelled || !token) return;
-        setPrefetchedToken(token);
-        prefetchedTokenAtRef.current = Date.now();
-      } catch (error) {
-        console.log('Failed to prefetch supabase token:', error);
-      }
-    }
-
-    prefetchToken();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, screenState, userId]);
 
   // Check for cached version when inputs change
   useEffect(() => {
@@ -186,29 +145,6 @@ export default function VisualizationScreen() {
     }
   }
 
-  async function getSupabaseTokenForGeneration(): Promise<{ token: string; tokenMs: number }> {
-    const tokenStart = Date.now();
-    const hasFreshPrefetch =
-      prefetchedToken && Date.now() - prefetchedTokenAtRef.current < PREFETCH_TOKEN_TTL_MS;
-
-    if (hasFreshPrefetch && prefetchedToken) {
-      return {
-        token: prefetchedToken,
-        tokenMs: Date.now() - tokenStart,
-      };
-    }
-
-    const token = await getToken({ template: 'supabase' });
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-    setPrefetchedToken(token);
-    prefetchedTokenAtRef.current = Date.now();
-    return {
-      token,
-      tokenMs: Date.now() - tokenStart,
-    };
-  }
 
   async function handleGenerate() {
     const generationStartedAt = Date.now();
@@ -255,14 +191,12 @@ export default function VisualizationScreen() {
     setIsGeneratingScript(true);
 
     try {
-      const { token, tokenMs } = await getSupabaseTokenForGeneration();
       const generationRequestStart = Date.now();
       const result = await generateVisualizationAudio({
         movement,
         cues,
         voiceId: selectedVoice.id,
         userSport,
-        token,
         stability: 0.6,
         similarityBoost: 0.8,
       });
@@ -277,7 +211,6 @@ export default function VisualizationScreen() {
           source: result.source,
           generationStartedAt,
           totalGenerationMs: Date.now() - generationStartedAt,
-          tokenMs,
           openRouterMs: result.timingsMs?.openRouter,
           textToSpeechMs: result.timingsMs?.textToSpeech,
           combinedRequestMs,
@@ -307,7 +240,6 @@ export default function VisualizationScreen() {
           source: result.source,
           generationStartedAt,
           totalGenerationMs: Date.now() - generationStartedAt,
-          tokenMs,
           openRouterMs: result.timingsMs?.openRouter,
           textToSpeechMs: result.timingsMs?.textToSpeech,
           combinedRequestMs,
@@ -324,7 +256,7 @@ export default function VisualizationScreen() {
         });
       } else if (result.audioData) {
         const base64Start = Date.now();
-        const audioBase64 = arrayBufferToBase64(result.audioData);
+        const audioBase64 = arrayBufferToBase64(result.audioData as ArrayBuffer);
         const base64EncodeMs = Date.now() - base64Start;
 
         const audioWriteStart = Date.now();
@@ -337,7 +269,6 @@ export default function VisualizationScreen() {
           source: result.source,
           generationStartedAt,
           totalGenerationMs: Date.now() - generationStartedAt,
-          tokenMs,
           openRouterMs: result.timingsMs?.openRouter,
           textToSpeechMs: result.timingsMs?.textToSpeech,
           combinedRequestMs,

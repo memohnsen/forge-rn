@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
-import { createClerkSupabaseClient } from '@/services/supabase';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
 import { CompReport } from '@/models/Competition';
@@ -28,97 +30,32 @@ interface UseHistoryDetailsReturn {
 }
 
 export function useHistory(): UseHistoryReturn {
-  const { getToken, userId } = useAuth();
-  const getTokenRef = useRef(getToken);
+  const { userId } = useAuth();
 
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
+  const convexCheckIns = useQuery(api.dailyCheckIns.listByUser, userId ? { userId } : 'skip');
+  const convexSessions = useQuery(api.sessionReports.listByUser, userId ? { userId } : 'skip');
+  const convexComps = useQuery(api.compReports.listByUser, userId ? { userId } : 'skip');
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getTokenRef.current({ template: 'supabase', skipCache: true });
-    });
-  }, []);
-
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
-  const [compReports, setCompReports] = useState<CompReport[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<HistoryFilter>('Check-Ins');
 
-  const fetchCheckIns = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('journal_daily_checkins')
-        .select('*')
-        .eq('user_id', userId)
-        .order('check_in_date', { ascending: false });
+  const isLoading =
+    convexCheckIns === undefined ||
+    convexSessions === undefined ||
+    convexComps === undefined;
 
-      if (fetchError) throw fetchError;
-      setCheckIns(data || []);
-    } catch (err) {
-      console.error('Error fetching check-ins:', err);
-      setError(err as Error);
-    }
-  }, [supabase, userId]);
+  const checkIns = (convexCheckIns as CheckIn[] | undefined) ?? [];
+  const sessionReports = (convexSessions as SessionReport[] | undefined) ?? [];
+  const compReports = (convexComps as CompReport[] | undefined) ?? [];
 
-  const fetchSessionReports = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('journal_session_report')
-        .select('*')
-        .eq('user_id', userId)
-        .order('session_date', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      setSessionReports(data || []);
-    } catch (err) {
-      console.error('Error fetching session reports:', err);
-      setError(err as Error);
-    }
-  }, [supabase, userId]);
-
-  const fetchCompReports = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('journal_comp_report')
-        .select('*')
-        .eq('user_id', userId)
-        .order('meet_date', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      setCompReports(data || []);
-    } catch (err) {
-      console.error('Error fetching comp reports:', err);
-      setError(err as Error);
-    }
-  }, [supabase, userId]);
-
-  const refresh = useCallback(async () => {
-    if (!userId) return;
-    setIsLoading(true);
-    setError(null);
-    await Promise.all([fetchCheckIns(), fetchSessionReports(), fetchCompReports()]);
-    setIsLoading(false);
-  }, [fetchCheckIns, fetchSessionReports, fetchCompReports, userId]);
-
-  useEffect(() => {
-    if (userId) {
-      refresh();
-    }
-  }, [userId]);
+  // Convex is reactive — refresh is a no-op
+  const refresh = useCallback(async () => {}, []);
 
   return {
     checkIns,
     sessionReports,
     compReports,
     isLoading,
-    error,
+    error: null,
     selectedFilter,
     setSelectedFilter,
     refresh,
@@ -127,109 +64,58 @@ export function useHistory(): UseHistoryReturn {
 
 export function useHistoryDetails(
   type: HistoryFilter,
-  id: number
+  id: string // Convex document _id string
 ): UseHistoryDetailsReturn {
-  const { getToken, userId, isLoaded } = useAuth();
-  const getTokenRef = useRef(getToken);
+  const { userId } = useAuth();
 
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
+  const convexCheckIn = useQuery(
+    api.dailyCheckIns.getById,
+    type === 'Check-Ins' && id ? { id: id as Id<'dailyCheckIns'> } : 'skip'
+  );
+  const convexSession = useQuery(
+    api.sessionReports.getById,
+    type === 'Workouts' && id ? { id: id as Id<'sessionReports'> } : 'skip'
+  );
+  const convexComp = useQuery(
+    api.compReports.getById,
+    type === 'Meets' && id ? { id: id as Id<'compReports'> } : 'skip'
+  );
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getTokenRef.current({ template: 'supabase', skipCache: true });
-    });
-  }, []);
+  const deleteCheckIn = useMutation(api.dailyCheckIns.deleteById);
+  const deleteSession = useMutation(api.sessionReports.deleteById);
+  const deleteComp = useMutation(api.compReports.deleteById);
 
-  const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
-  const [session, setSession] = useState<SessionReport | null>(null);
-  const [comp, setComp] = useState<CompReport | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    const fetchDetails = async () => {
-      if (!isLoaded) {
-        setIsLoading(true);
-        return;
-      }
+  const isLoading =
+    (type === 'Check-Ins' && convexCheckIn === undefined) ||
+    (type === 'Workouts' && convexSession === undefined) ||
+    (type === 'Meets' && convexComp === undefined);
 
-      if (!userId || !id) {
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        if (type === 'Check-Ins') {
-          const { data, error: fetchError } = await supabase
-            .from('journal_daily_checkins')
-            .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .maybeSingle();
-
-          if (fetchError) throw fetchError;
-          setCheckIn(data);
-        } else if (type === 'Workouts') {
-          const { data, error: fetchError } = await supabase
-            .from('journal_session_report')
-            .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .maybeSingle();
-
-          if (fetchError) throw fetchError;
-          setSession(data);
-        } else if (type === 'Meets') {
-          const { data, error: fetchError } = await supabase
-            .from('journal_comp_report')
-            .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .maybeSingle();
-
-          if (fetchError) throw fetchError;
-          setComp(data);
-        }
-      } catch (err) {
-        console.error('Error fetching details:', err);
-        setError(err as Error);
-      }
-
-      setIsLoading(false);
-    };
-
-    fetchDetails();
-  }, [type, id, supabase, userId, isLoaded]);
+  // Verify ownership before returning
+  const checkIn =
+    convexCheckIn && convexCheckIn.userId === userId ? (convexCheckIn as CheckIn) : null;
+  const session =
+    convexSession && convexSession.userId === userId ? (convexSession as SessionReport) : null;
+  const comp =
+    convexComp && convexComp.userId === userId ? (convexComp as CompReport) : null;
 
   const deleteItem = useCallback(async (): Promise<boolean> => {
     try {
-      let tableName = '';
-      if (type === 'Check-Ins') {
-        tableName = 'journal_daily_checkins';
-      } else if (type === 'Workouts') {
-        tableName = 'journal_session_report';
-      } else if (type === 'Meets') {
-        tableName = 'journal_comp_report';
+      if (type === 'Check-Ins' && id) {
+        await deleteCheckIn({ id: id as Id<'dailyCheckIns'> });
+      } else if (type === 'Workouts' && id) {
+        await deleteSession({ id: id as Id<'sessionReports'> });
+      } else if (type === 'Meets' && id) {
+        await deleteComp({ id: id as Id<'compReports'> });
       }
-
-      const { error: deleteError } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) throw deleteError;
       return true;
     } catch (err) {
       console.error('Error deleting item:', err);
       setError(err as Error);
       return false;
     }
-  }, [type, id, supabase]);
+  }, [type, id, deleteCheckIn, deleteSession, deleteComp]);
 
   return {
     checkIn,
@@ -241,29 +127,23 @@ export function useHistoryDetails(
   };
 }
 
-// Score color helper
 export function getScoreColor(score: number, type: HistoryFilter): string {
   if (type === 'Check-Ins') {
-    if (score >= 80) return '#5AB48C'; // Green
-    if (score >= 60) return '#FFB450'; // Orange/Yellow
-    return '#DC6464'; // Red
+    if (score >= 80) return '#5AB48C';
+    if (score >= 60) return '#FFB450';
+    return '#DC6464';
   } else if (type === 'Workouts') {
-    // RPE: lower is better
-    if (score <= 2) return '#5AB48C'; // Green
-    if (score <= 3) return '#FFB450'; // Orange/Yellow
-    return '#DC6464'; // Red
+    if (score <= 2) return '#5AB48C';
+    if (score <= 3) return '#FFB450';
+    return '#DC6464';
   }
-  return '#5386E4'; // Blue default
+  return '#5386E4';
 }
 
-// Accent color for filter type
 export function getAccentColor(type: HistoryFilter): string {
   switch (type) {
-    case 'Meets':
-      return '#FFD700'; // Gold
-    case 'Workouts':
-      return '#5386E4'; // Blue
-    default:
-      return '#5AB48C'; // Green for check-ins
+    case 'Meets': return '#FFD700';
+    case 'Workouts': return '#5386E4';
+    default: return '#5AB48C';
   }
 }

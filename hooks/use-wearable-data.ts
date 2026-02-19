@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   fetchOuraDailyData,
@@ -17,15 +17,10 @@ export interface WearableDataForDate {
 }
 
 export function useWearableDataForDate(dateString: string) {
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const [data, setData] = useState<WearableDataForDate>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const getTokenRef = useRef(getToken);
-
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
 
   const parseLocalDate = (value: string) => {
     const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -94,18 +89,9 @@ export function useWearableDataForDate(dateString: string) {
       const endDate = new Date(targetDate);
       endDate.setDate(endDate.getDate() + 1); // Day after for safety
 
-      const getClerkToken = async () => {
-        try {
-          return await getTokenRef.current({ template: 'supabase' });
-        } catch (error) {
-          console.warn('[useWearableDataForDate] Failed to get Clerk token:', error);
-          return null;
-        }
-      };
-
       const [ouraConnected, whoopConnected] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId, getClerkToken),
+        isWhoopConnected(userId),
       ]);
 
       const result: WearableDataForDate = {};
@@ -123,7 +109,7 @@ export function useWearableDataForDate(dateString: string) {
       // Fetch Whoop data
       if (whoopConnected) {
         try {
-          const whoopData = await fetchWhoopDailyData(userId, startDate, endDate, getClerkToken);
+          const whoopData = await fetchWhoopDailyData(userId, startDate, endDate);
           result.whoop = findClosestByDate(whoopData, targetDate, 1) ?? undefined;
         } catch (whoopError) {
           console.warn('[useWearableDataForDate] Failed to fetch Whoop data:', whoopError);
@@ -154,15 +140,10 @@ export function useWearableDataForDate(dateString: string) {
 }
 
 export function useWearableConnectionStatus() {
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const getTokenRef = useRef(getToken);
-
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
 
   const checkStatus = useCallback(async () => {
     if (!userId) {
@@ -174,18 +155,9 @@ export function useWearableConnectionStatus() {
 
     setIsLoading(true);
     try {
-      const getClerkToken = async () => {
-        try {
-          return await getTokenRef.current({ template: 'supabase' });
-        } catch (error) {
-          console.warn('[useWearableConnectionStatus] Failed to get Clerk token:', error);
-          return null;
-        }
-      };
-
       const [oura, whoop] = await Promise.all([
         isOuraConnected(userId),
-        isWhoopConnected(userId, getClerkToken),
+        isWhoopConnected(userId),
       ]);
       setOuraConnected(oura);
       setWhoopConnected(whoop);

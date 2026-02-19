@@ -1,12 +1,15 @@
+import { Id } from '@/convex/_generated/dataModel';
+
 export interface CheckIn {
-  id?: number;
-  user_id: string;
-  check_in_date: string;
-  selected_lift: string;
-  selected_intensity: string;
+  _id: Id<'dailyCheckIns'>;
+  _creationTime: number;
+  userId: string;
+  checkInDate: string;
+  selectedLift: string;
+  selectedIntensity: string;
   goal: string;
-  physical_strength: number;
-  mental_strength: number;
+  physicalStrength: number;
+  mentalStrength: number;
   recovered: number;
   confidence: number;
   sleep: number;
@@ -16,10 +19,10 @@ export interface CheckIn {
   readiness: number;
   focus: number;
   excitement: number;
-  body_connection: number;
+  bodyConnection: number;
   concerns?: string;
-  physical_score: number;
-  mental_score: number;
-  overall_score: number;
-  created_at: string;
+  physicalScore: number;
+  mentalScore: number;
+  overallScore: number;
+  legacyId?: number;
 }

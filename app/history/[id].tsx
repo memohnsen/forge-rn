@@ -223,6 +223,9 @@ const ResultsDisplaySection: React.FC<ResultsDisplaySectionProps> = ({
 }) => {
   const isOlympicWeightlifting = userSport === 'Olympic Weightlifting';
 
+  const getAttempt = (attempts: Array<{ weight: string }> | undefined, idx: number) =>
+    attempts?.[idx]?.weight || '0';
+
   return (
     <View
       style={[
@@ -240,17 +243,17 @@ const ResultsDisplaySection: React.FC<ResultsDisplaySectionProps> = ({
         <>
           <LiftResultRow
             liftName="Snatch"
-            attempt1={comp.snatch1 || '0'}
-            attempt2={comp.snatch2 || '0'}
-            attempt3={comp.snatch3 || '0'}
+            attempt1={getAttempt(comp.snatchAttempts, 0)}
+            attempt2={getAttempt(comp.snatchAttempts, 1)}
+            attempt3={getAttempt(comp.snatchAttempts, 2)}
             isDark={isDark}
           />
           <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#E5E5E5' }]} />
           <LiftResultRow
             liftName="Clean & Jerk"
-            attempt1={comp.cj1 || '0'}
-            attempt2={comp.cj2 || '0'}
-            attempt3={comp.cj3 || '0'}
+            attempt1={getAttempt(comp.cjAttempts, 0)}
+            attempt2={getAttempt(comp.cjAttempts, 1)}
+            attempt3={getAttempt(comp.cjAttempts, 2)}
             isDark={isDark}
           />
         </>
@@ -258,25 +261,25 @@ const ResultsDisplaySection: React.FC<ResultsDisplaySectionProps> = ({
         <>
           <LiftResultRow
             liftName="Squat"
-            attempt1={comp.squat1 || '0'}
-            attempt2={comp.squat2 || '0'}
-            attempt3={comp.squat3 || '0'}
+            attempt1={getAttempt(comp.squatAttempts, 0)}
+            attempt2={getAttempt(comp.squatAttempts, 1)}
+            attempt3={getAttempt(comp.squatAttempts, 2)}
             isDark={isDark}
           />
           <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#E5E5E5' }]} />
           <LiftResultRow
             liftName="Bench"
-            attempt1={comp.bench1 || '0'}
-            attempt2={comp.bench2 || '0'}
-            attempt3={comp.bench3 || '0'}
+            attempt1={getAttempt(comp.benchAttempts, 0)}
+            attempt2={getAttempt(comp.benchAttempts, 1)}
+            attempt3={getAttempt(comp.benchAttempts, 2)}
             isDark={isDark}
           />
           <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#E5E5E5' }]} />
           <LiftResultRow
             liftName="Deadlift"
-            attempt1={comp.deadlift1 || '0'}
-            attempt2={comp.deadlift2 || '0'}
-            attempt3={comp.deadlift3 || '0'}
+            attempt1={getAttempt(comp.deadliftAttempts, 0)}
+            attempt2={getAttempt(comp.deadliftAttempts, 1)}
+            attempt3={getAttempt(comp.deadliftAttempts, 2)}
             isDark={isDark}
           />
         </>
@@ -481,9 +484,8 @@ export default function HistoryDetailsScreen() {
 
   // Ensure type has a valid default
   const type: HistoryFilter = (rawType as HistoryFilter) || 'Check-Ins';
-  const numId = parseInt(id || '0');
 
-  const { checkIn, session, comp, isLoading, deleteItem } = useHistoryDetails(type, numId);
+  const { checkIn, session, comp, isLoading, deleteItem } = useHistoryDetails(type, id || '');
   const { user } = useHome();
   const hasTrackedView = useRef(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -492,7 +494,6 @@ export default function HistoryDetailsScreen() {
 
   const userSport = user?.sport || 'Powerlifting';
 
-  // Get the item data based on type
   const item = useMemo(() => {
     if (type === 'Check-Ins') return checkIn;
     if (type === 'Workouts') return session;
@@ -502,60 +503,54 @@ export default function HistoryDetailsScreen() {
 
   const pageTitle = useMemo(() => {
     if (!item) return 'Loading...';
-    if (type === 'Meets') {
-      return (item as CompReport).meet;
-    } else if (type === 'Workouts') {
+    if (type === 'Meets') return (item as CompReport).meet;
+    if (type === 'Workouts') {
       const s = item as SessionReport;
-      return `${s.selected_intensity} ${s.selected_lift}`;
-    } else {
-      const c = item as CheckIn;
-      return `${c.selected_intensity} ${c.selected_lift}`;
+      return `${s.selectedIntensity} ${s.selectedLift}`;
     }
+    const c = item as CheckIn;
+    return `${c.selectedIntensity} ${c.selectedLift}`;
   }, [item, type]);
 
   useEffect(() => {
     if (isLoading || !item || hasTrackedView.current) return;
     trackScreenView('history_detail');
-    trackHistoryItemViewed(type, numId);
-    if (type === 'Check-Ins') {
-      trackCheckInViewed(numId);
-    } else if (type === 'Workouts') {
-      trackSessionReflectionViewed(numId);
-    } else if (type === 'Meets') {
-      trackCompReflectionViewed(numId);
-    }
+    trackHistoryItemViewed(type, 0);
+    if (type === 'Check-Ins') trackCheckInViewed(0);
+    else if (type === 'Workouts') trackSessionReflectionViewed(0);
+    else if (type === 'Meets') trackCompReflectionViewed(0);
     hasTrackedView.current = true;
-  }, [isLoading, item, numId, type]);
+  }, [isLoading, item, type]);
 
   const handleShare = async () => {
     let shareText = '';
 
     if (type === 'Check-Ins' && checkIn) {
-      shareText = `Check-In Results for ${formatDate(checkIn.check_in_date)}
+      shareText = `Check-In Results for ${formatDate(checkIn.checkInDate)}
 
-Overall Readiness: ${checkIn.overall_score}%
-Physical Readiness: ${checkIn.physical_score}%
-Mental Readiness: ${checkIn.mental_score}%
+Overall Readiness: ${checkIn.overallScore}%
+Physical Readiness: ${checkIn.physicalScore}%
+Mental Readiness: ${checkIn.mentalScore}%
 
 Daily Goal: ${checkIn.goal}
 
 Powered By Forge - Performance Journal`;
     } else if (type === 'Workouts' && session) {
-      shareText = `Session Results for ${formatDate(session.session_date)}
-Session Focus: ${session.selected_intensity} ${session.selected_lift}
+      shareText = `Session Results for ${formatDate(session.sessionDate)}
+Session Focus: ${session.selectedIntensity} ${session.selectedLift}
 
-Session RPE: ${session.session_rpe}/5
-Movement Quality: ${session.movement_quality}/5
+Session RPE: ${session.sessionRpe}/5
+Movement Quality: ${session.movementQuality}/5
 Focus: ${session.focus}/5
 
 Powered By Forge - Performance Journal`;
     } else if (type === 'Meets' && comp) {
-      const total = (comp.squat_best || 0) + (comp.bench_best || 0) + (comp.deadlift_best || 0);
-      shareText = `Meet Results for ${comp.meet} - ${formatDate(comp.meet_date)}
+      const total = (comp.squatBest || 0) + (comp.benchBest || 0) + (comp.deadliftBest || 0);
+      shareText = `Meet Results for ${comp.meet} - ${formatDate(comp.meetDate)}
 
-${comp.squat_best}/${comp.bench_best}/${comp.deadlift_best}/${total}kg
+${comp.squatBest}/${comp.benchBest}/${comp.deadliftBest}/${total}kg
 
-Performance Rating: ${comp.performance_rating}/5
+Performance Rating: ${comp.performanceRating}/5
 
 Powered By Forge - Performance Journal`;
     }
@@ -572,11 +567,11 @@ Powered By Forge - Performance Journal`;
     if (type === 'Check-Ins' && checkIn) {
       return {
         title: 'Check-In Results',
-        subtitle: formatDate(checkIn.check_in_date) || '',
+        subtitle: formatDate(checkIn.checkInDate) || '',
         stats: [
-          { label: 'Overall', value: `${checkIn.overall_score}%` },
-          { label: 'Physical', value: `${checkIn.physical_score}%` },
-          { label: 'Mental', value: `${checkIn.mental_score}%` },
+          { label: 'Overall', value: `${checkIn.overallScore}%` },
+          { label: 'Physical', value: `${checkIn.physicalScore}%` },
+          { label: 'Mental', value: `${checkIn.mentalScore}%` },
         ],
       };
     }
@@ -584,24 +579,24 @@ Powered By Forge - Performance Journal`;
     if (type === 'Workouts' && session) {
       return {
         title: 'Session Results',
-        subtitle: formatDate(session.session_date) || '',
+        subtitle: formatDate(session.sessionDate) || '',
         stats: [
-          { label: 'RPE', value: `${session.session_rpe}/5` },
-          { label: 'Quality', value: `${session.movement_quality}/5` },
+          { label: 'RPE', value: `${session.sessionRpe}/5` },
+          { label: 'Quality', value: `${session.movementQuality}/5` },
           { label: 'Focus', value: `${session.focus}/5` },
         ],
       };
     }
 
     if (type === 'Meets' && comp) {
-      const total = (comp.squat_best || 0) + (comp.bench_best || 0) + (comp.deadlift_best || 0);
+      const total = (comp.squatBest || 0) + (comp.benchBest || 0) + (comp.deadliftBest || 0);
       return {
         title: comp.meet,
-        subtitle: formatDate(comp.meet_date) || '',
+        subtitle: formatDate(comp.meetDate) || '',
         stats: [
           { label: 'Total', value: `${total}kg` },
-          { label: 'Squat', value: `${comp.squat_best || 0}kg` },
-          { label: 'Bench', value: `${comp.bench_best || 0}kg` },
+          { label: 'Squat', value: `${comp.squatBest || 0}kg` },
+          { label: 'Bench', value: `${comp.benchBest || 0}kg` },
         ],
       };
     }
@@ -678,253 +673,77 @@ Powered By Forge - Performance Journal`;
 
     router.replace({
       pathname: pathname as any,
-      params: { editId: String(numId) },
+      params: { editId: id },
     });
   };
 
   const renderCheckInContent = (checkIn: CheckIn) => (
     <>
-      <WearableDataSection dateString={checkIn.check_in_date} isDark={isDark} />
-      <RatingDisplaySection
-        title="Overall Readiness"
-        value={`${checkIn.overall_score}%`}
-        isRawValue
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="Physical Readiness"
-        value={`${checkIn.physical_score}%`}
-        isRawValue
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="Mental Readiness"
-        value={`${checkIn.mental_score}%`}
-        isRawValue
-        isDark={isDark}
-      />
-      <TextDisplaySection
-        title="What would make today feel like a successful session for you?"
-        value={checkIn.goal}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How strong does your body feel?"
-        value={`${checkIn.physical_strength}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How strong does your mind feel?"
-        value={`${checkIn.mental_strength}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How recovered do you feel?"
-        value={`${checkIn.recovered}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How confident do you feel?"
-        value={`${checkIn.confidence}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="Rate last night's sleep quality"
-        value={`${checkIn.sleep}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How energized do you feel?"
-        value={`${checkIn.energy}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How stressed do you feel?"
-        value={`${checkIn.stress}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How sore does your body feel?"
-        value={`${checkIn.soreness}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How ready do you feel to train?"
-        value={`${checkIn.readiness}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How focused do you feel?"
-        value={`${checkIn.focus}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How excited do you feel about today's session?"
-        value={`${checkIn.excitement}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How connected do you feel to your body?"
-        value={`${checkIn.body_connection}`}
-        isDark={isDark}
-      />
-      <TextDisplaySection
-        title="What concerns or worries do you have going into today's session?"
-        value={checkIn.concerns || ''}
-        isDark={isDark}
-      />
+      <WearableDataSection dateString={checkIn.checkInDate} isDark={isDark} />
+      <RatingDisplaySection title="Overall Readiness" value={`${checkIn.overallScore}%`} isRawValue isDark={isDark} />
+      <RatingDisplaySection title="Physical Readiness" value={`${checkIn.physicalScore}%`} isRawValue isDark={isDark} />
+      <RatingDisplaySection title="Mental Readiness" value={`${checkIn.mentalScore}%`} isRawValue isDark={isDark} />
+      <TextDisplaySection title="What would make today feel like a successful session for you?" value={checkIn.goal} isDark={isDark} />
+      <RatingDisplaySection title="How strong does your body feel?" value={`${checkIn.physicalStrength}`} isDark={isDark} />
+      <RatingDisplaySection title="How strong does your mind feel?" value={`${checkIn.mentalStrength}`} isDark={isDark} />
+      <RatingDisplaySection title="How recovered do you feel?" value={`${checkIn.recovered}`} isDark={isDark} />
+      <RatingDisplaySection title="How confident do you feel?" value={`${checkIn.confidence}`} isDark={isDark} />
+      <RatingDisplaySection title="Rate last night's sleep quality" value={`${checkIn.sleep}`} isDark={isDark} />
+      <RatingDisplaySection title="How energized do you feel?" value={`${checkIn.energy}`} isDark={isDark} />
+      <RatingDisplaySection title="How stressed do you feel?" value={`${checkIn.stress}`} isDark={isDark} />
+      <RatingDisplaySection title="How sore does your body feel?" value={`${checkIn.soreness}`} isDark={isDark} />
+      <RatingDisplaySection title="How ready do you feel to train?" value={`${checkIn.readiness}`} isDark={isDark} />
+      <RatingDisplaySection title="How focused do you feel?" value={`${checkIn.focus}`} isDark={isDark} />
+      <RatingDisplaySection title="How excited do you feel about today's session?" value={`${checkIn.excitement}`} isDark={isDark} />
+      <RatingDisplaySection title="How connected do you feel to your body?" value={`${checkIn.bodyConnection}`} isDark={isDark} />
+      <TextDisplaySection title="What concerns or worries do you have going into today's session?" value={checkIn.concerns || ''} isDark={isDark} />
     </>
   );
 
   const renderSessionContent = (session: SessionReport) => (
     <>
-      <WearableDataSection dateString={session.session_date} isDark={isDark} />
-      <TextDisplaySection
-        title="Time of day you trained"
-        value={session.time_of_day}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How hard did this session feel?"
-        value={`${session.session_rpe}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How did your movement quality feel?"
-        value={`${session.movement_quality}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How was your focus during the session?"
-        value={`${session.focus}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="Misses"
-        value={session.misses}
-        isRawValue
-        isDark={isDark}
-      />
-      <TextDisplaySection
-        title="What cues made a difference?"
-        value={session.cues}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How does your body feel now?"
-        value={`${session.feeling}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How satisfied do you feel with this session?"
-        value={`${session.satisfaction}`}
-        isDark={isDark}
-      />
-      <RatingDisplaySection
-        title="How confident do you feel after this session?"
-        value={`${session.confidence}`}
-        isDark={isDark}
-      />
-      <TextDisplaySection
-        title="Did you learn anything about yourself during this session?"
-        value={session.what_learned || ''}
-        isDark={isDark}
-      />
-      <TextDisplaySection
-        title="Would you do anything differently next time?"
-        value={session.what_would_change || ''}
-        isDark={isDark}
-      />
+      <WearableDataSection dateString={session.sessionDate} isDark={isDark} />
+      <TextDisplaySection title="Time of day you trained" value={session.timeOfDay} isDark={isDark} />
+      <RatingDisplaySection title="How hard did this session feel?" value={`${session.sessionRpe}`} isDark={isDark} />
+      <RatingDisplaySection title="How did your movement quality feel?" value={`${session.movementQuality}`} isDark={isDark} />
+      <RatingDisplaySection title="How was your focus during the session?" value={`${session.focus}`} isDark={isDark} />
+      <RatingDisplaySection title="Misses" value={session.misses} isRawValue isDark={isDark} />
+      <TextDisplaySection title="What cues made a difference?" value={session.cues} isDark={isDark} />
+      <RatingDisplaySection title="How does your body feel now?" value={`${session.feeling}`} isDark={isDark} />
+      <RatingDisplaySection title="How satisfied do you feel with this session?" value={`${session.satisfaction}`} isDark={isDark} />
+      <RatingDisplaySection title="How confident do you feel after this session?" value={`${session.confidence}`} isDark={isDark} />
+      <TextDisplaySection title="Did you learn anything about yourself during this session?" value={session.whatLearned || ''} isDark={isDark} />
+      <TextDisplaySection title="Would you do anything differently next time?" value={session.whatWouldChange || ''} isDark={isDark} />
     </>
   );
 
   const renderCompContent = (comp: CompReport) => {
     const total =
       userSport === 'Olympic Weightlifting'
-        ? (comp.snatch_best || 0) + (comp.cj_best || 0)
-        : (comp.squat_best || 0) + (comp.bench_best || 0) + (comp.deadlift_best || 0);
+        ? (comp.snatchBest || 0) + (comp.cjBest || 0)
+        : (comp.squatBest || 0) + (comp.benchBest || 0) + (comp.deadliftBest || 0);
 
     return (
       <>
-        <WearableDataSection dateString={comp.meet_date} isDark={isDark} />
+        <WearableDataSection dateString={comp.meetDate} isDark={isDark} />
         <ResultsDisplaySection comp={comp} userSport={userSport} isDark={isDark} />
         <RatingDisplaySection title="Total" value={`${total}kg`} isRawValue isDark={isDark} />
         <TextDisplaySection title="Bodyweight" value={`${comp.bodyweight}kg`} isDark={isDark} />
-        <RatingDisplaySection
-          title="How would you rate your performance?"
-          value={`${comp.performance_rating}`}
-          isDark={isDark}
-        />
-        <RatingDisplaySection
-          title="How would you rate your physical preparedness?"
-          value={`${comp.physical_preparedness_rating}`}
-          isDark={isDark}
-        />
-        <RatingDisplaySection
-          title="How would you rate your mental preparedness?"
-          value={`${comp.mental_preparedness_rating}`}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="How was your nutrition?"
-          value={comp.nutrition}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="How was your hydration?"
-          value={comp.hydration}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What did you do well?"
-          value={comp.did_well}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What could you have done better?"
-          value={comp.needs_work}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What in training helped you feel prepared for the platform?"
-          value={comp.good_from_training}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What cues worked best for you?"
-          value={comp.cues}
-          isDark={isDark}
-        />
-        <RatingDisplaySection
-          title="How satisfied do you feel with this meet?"
-          value={`${comp.satisfaction}`}
-          isDark={isDark}
-        />
-        <RatingDisplaySection
-          title="How confident do you feel after this meet?"
-          value={`${comp.confidence}`}
-          isDark={isDark}
-        />
-        <RatingDisplaySection
-          title="How did you handle pressure during the meet?"
-          value={`${comp.pressure_handling}`}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What did you learn about yourself during this meet?"
-          value={comp.what_learned}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What are you most proud of from this meet?"
-          value={comp.what_proud_of}
-          isDark={isDark}
-        />
-        <TextDisplaySection
-          title="What do you need to focus on for the next meet?"
-          value={comp.focus}
-          isDark={isDark}
-        />
+        <RatingDisplaySection title="How would you rate your performance?" value={`${comp.performanceRating}`} isDark={isDark} />
+        <RatingDisplaySection title="How would you rate your physical preparedness?" value={`${comp.physicalPreparednessRating}`} isDark={isDark} />
+        <RatingDisplaySection title="How would you rate your mental preparedness?" value={`${comp.mentalPreparednessRating}`} isDark={isDark} />
+        <TextDisplaySection title="How was your nutrition?" value={comp.nutrition || ''} isDark={isDark} />
+        <TextDisplaySection title="How was your hydration?" value={comp.hydration || ''} isDark={isDark} />
+        <TextDisplaySection title="What did you do well?" value={comp.didWell} isDark={isDark} />
+        <TextDisplaySection title="What could you have done better?" value={comp.needsWork} isDark={isDark} />
+        <TextDisplaySection title="What in training helped you feel prepared for the platform?" value={comp.goodFromTraining} isDark={isDark} />
+        <TextDisplaySection title="What cues worked best for you?" value={comp.cues} isDark={isDark} />
+        <RatingDisplaySection title="How satisfied do you feel with this meet?" value={`${comp.satisfaction}`} isDark={isDark} />
+        <RatingDisplaySection title="How confident do you feel after this meet?" value={`${comp.confidence}`} isDark={isDark} />
+        <RatingDisplaySection title="How did you handle pressure during the meet?" value={`${comp.pressureHandling}`} isDark={isDark} />
+        <TextDisplaySection title="What did you learn about yourself during this meet?" value={comp.whatLearned || ''} isDark={isDark} />
+        <TextDisplaySection title="What are you most proud of from this meet?" value={comp.whatProudOf || ''} isDark={isDark} />
+        <TextDisplaySection title="What do you need to focus on for the next meet?" value={comp.focus} isDark={isDark} />
       </>
     );
   };

@@ -33,7 +33,7 @@ export default function SettingsScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const { user, fetchUsers, updateCoachEmail } = useHome();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -48,10 +48,7 @@ export default function SettingsScreen() {
     setIsExporting(true);
 
     try {
-      const success = await createAndShareCSV({
-        userId,
-        getToken: async () => getToken({ template: 'supabase', skipCache: true })
-      });
+      const success = await createAndShareCSV({ userId });
 
       if (success) {
         // Share sheet will handle the export, no alert needed

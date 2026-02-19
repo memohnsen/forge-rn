@@ -91,12 +91,12 @@ class StreakManager {
     const dates = new Set<string>();
 
     checkIns.forEach((checkIn) => {
-      const dateOnly = checkIn.check_in_date.substring(0, 10);
+      const dateOnly = checkIn.checkInDate.substring(0, 10);
       dates.add(dateOnly);
     });
 
     sessionReports.forEach((report) => {
-      const dateOnly = report.session_date.substring(0, 10);
+      const dateOnly = report.sessionDate.substring(0, 10);
       dates.add(dateOnly);
     });
 

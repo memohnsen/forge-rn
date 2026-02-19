@@ -150,19 +150,19 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ checkIns, isLoad
 
       {checkIns.slice(0, 5).map((checkIn, index) => (
         <HistoryItemCard
-          key={checkIn.id}
-          intensity={checkIn.selected_intensity}
-          lift={checkIn.selected_lift}
-          date={formatDate(checkIn.check_in_date) || checkIn.check_in_date}
-          score={checkIn.overall_score}
+          key={checkIn._id}
+          intensity={checkIn.selectedIntensity}
+          lift={checkIn.selectedLift}
+          date={formatDate(checkIn.checkInDate) || checkIn.checkInDate}
+          score={checkIn.overallScore}
           index={index}
           onPress={() =>
             router.push({
               pathname: '/history/[id]' as any,
               params: {
-                id: checkIn.id?.toString() || '',
-                title: checkIn.selected_lift,
-                date: checkIn.check_in_date,
+                id: checkIn._id,
+                title: checkIn.selectedLift,
+                date: checkIn.checkInDate,
               },
             })
           }

@@ -1,13 +1,14 @@
 import { colors } from '@/constants/colors';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { trackContentShared } from '@/utils/analytics';
 import { formatToISO } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
@@ -24,7 +25,7 @@ export default function CheckInConfirmationScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { getToken, userId } = useAuth();
+  const { userId } = useAuth();
 
   const { overallScore, physicalScore, mentalScore, selectedLift, selectedIntensity, sessionDate } =
     useLocalSearchParams<{
@@ -54,69 +55,37 @@ export default function CheckInConfirmationScreen() {
 
   const overallColor = getScoreColor(overall);
   const [isSharingImage, setIsSharingImage] = useState(false);
-  const [trendAlert, setTrendAlert] = useState<TrendAlert | null>(null);
   const shareCardRef = useRef<View>(null);
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
-    });
-  }, [getToken]);
 
-  useEffect(() => {
-    const loadTrendAlert = async () => {
-      if (!userId) {
-        setTrendAlert(null);
-        return;
-      }
+  // Build date range for trend comparison (14 days before anchor date)
+  const trendDateRange = useMemo(() => {
+    const anchorDate = sessionDate ? new Date(sessionDate) : new Date();
+    if (Number.isNaN(anchorDate.getTime())) return null;
+    const startDate = new Date(anchorDate);
+    startDate.setDate(startDate.getDate() - 14);
+    return { start: formatToISO(startDate), end: formatToISO(anchorDate) };
+  }, [sessionDate]);
 
-      const anchorDate = sessionDate ? new Date(sessionDate) : new Date();
-      if (Number.isNaN(anchorDate.getTime())) {
-        setTrendAlert(null);
-        return;
-      }
+  const recentCheckIns = useQuery(
+    api.dailyCheckIns.listByUser,
+    userId ? { userId } : 'skip'
+  );
 
-      const endDate = new Date(anchorDate);
-      const startDate = new Date(anchorDate);
-      startDate.setDate(startDate.getDate() - 14);
-
-      const { data, error } = await supabase
-        .from('journal_daily_checkins')
-        .select('overall_score')
-        .eq('user_id', userId)
-        .gte('check_in_date', formatToISO(startDate))
-        .lt('check_in_date', formatToISO(endDate));
-
-      if (error || !data?.length) {
-        setTrendAlert(null);
-        return;
-      }
-
-      const baselineAverage =
-        data.reduce((total, item) => total + (item.overall_score ?? 0), 0) / data.length;
-      const delta = overall - baselineAverage;
-      const absoluteDelta = Math.round(Math.abs(delta));
-
-      if (absoluteDelta < SIGNIFICANT_TREND_MARGIN) {
-        setTrendAlert(null);
-        return;
-      }
-
-      if (delta > 0) {
-        setTrendAlert({
-          message: `Alert: You're trending upward ${absoluteDelta} points above your 2-week average.`,
-          color: colors.scoreGreen,
-        });
-        return;
-      }
-
-      setTrendAlert({
-        message: `Alert: You're trending downward ${absoluteDelta} points below your 2-week average.`,
-        color: colors.scoreRed,
-      });
-    };
-
-    loadTrendAlert();
-  }, [overall, sessionDate, supabase, userId]);
+  const trendAlert = useMemo<TrendAlert | null>(() => {
+    if (!trendDateRange || !recentCheckIns) return null;
+    const baseline = recentCheckIns.filter(
+      (c) => c.checkInDate >= trendDateRange.start && c.checkInDate < trendDateRange.end
+    );
+    if (baseline.length === 0) return null;
+    const baselineAverage =
+      baseline.reduce((total, item) => total + item.overallScore, 0) / baseline.length;
+    const delta = overall - baselineAverage;
+    const absoluteDelta = Math.round(Math.abs(delta));
+    if (absoluteDelta < SIGNIFICANT_TREND_MARGIN) return null;
+    return delta > 0
+      ? { message: `Alert: You're trending upward ${absoluteDelta} points above your 2-week average.`, color: colors.scoreGreen }
+      : { message: `Alert: You're trending downward ${absoluteDelta} points below your 2-week average.`, color: colors.scoreRed };
+  }, [overall, trendDateRange, recentCheckIns]);
 
   const handleDone = () => {
     router.replace('/(tabs)');

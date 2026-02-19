@@ -1,7 +1,8 @@
 import { colors } from '@/constants/colors';
 import { queryOpenRouter } from '@/services/openrouter';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { router } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
@@ -44,49 +45,24 @@ export default function ObjectiveReviewScreen() {
   const insets = useSafeAreaInsets();
   const { userId, getToken } = useAuth();
 
+  const convexUser = useQuery(api.users.getByUserId, userId ? { userId } : 'skip');
+  const insertReview = useMutation(api.objectiveReviews.insert);
+  const historyReviews = useQuery(api.objectiveReviews.listByUser, userId ? { userId } : 'skip');
+
   const [currentState, setCurrentState] = useState<ReviewState>('vent');
   const [ventText, setVentText] = useState('');
   const [reframedText, setReframedText] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [userSport, setUserSport] = useState('Olympic Weightlifting');
-  const [historyReviews, setHistoryReviews] = useState<any[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [expandedReviewId, setExpandedReviewId] = useState<number | null>(null);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const exerciseStartRef = useRef<number>(Date.now());
+
+  const userSport = convexUser?.sport ?? 'Olympic Weightlifting';
+  const isLoadingHistory = historyReviews === undefined;
 
   useEffect(() => {
     trackScreenView('objective_review');
     trackMentalExerciseStarted('objective_review');
   }, []);
-
-  // Fetch user's sport on mount
-  useEffect(() => {
-    const fetchUserSport = async () => {
-      if (!userId) return;
-
-      try {
-        const token = await getToken();
-        if (!token) return;
-
-        const supabase = createClerkSupabaseClient(getToken);
-        const { data, error } = await supabase
-          .from('journal_users')
-          .select('sport')
-          .eq('user_id', userId)
-          .single();
-
-        if (error) throw error;
-        if (data?.sport) {
-          setUserSport(data.sport);
-        }
-      } catch (err) {
-        console.error('Error fetching user sport:', err);
-        // Keep default sport if fetch fails
-      }
-    };
-
-    void fetchUserSport();
-  }, [userId, getToken]);
 
   const handleReframe = useCallback(async () => {
     if (!ventText.trim()) {
@@ -142,29 +118,11 @@ Response Format:
     if (!userId) return;
 
     try {
-      const token = await getToken();
-      if (!token) throw new Error('Missing token');
-
-      const supabase = createClerkSupabaseClient(getToken);
-
-      const payload = {
-        user_id: userId,
-        athlete_vent: ventText,
-        coach_reframe: reframedText,
-        created_at: new Date().toISOString(),
-      };
-
-      console.log('Saving objective review:', payload);
-
-      const { error } = await supabase
-        .from('journal_objective_review')
-        .insert(payload)
-        .select();
-
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
-      }
+      await insertReview({
+        userId,
+        athleteVent: ventText,
+        coachReframe: reframedText,
+      });
 
       Alert.alert('Success!', 'Your training cues have been saved!', [
         {
@@ -183,7 +141,7 @@ Response Format:
       const errorMessage = err instanceof Error ? err.message : 'Unable to save. Please try again.';
       Alert.alert('Error', errorMessage);
     }
-  }, [userId, ventText, reframedText, getToken]);
+  }, [userId, ventText, reframedText, insertReview]);
 
   const handleReset = useCallback(() => {
     setVentText('');
@@ -191,37 +149,6 @@ Response Format:
     setCurrentState('vent');
   }, []);
 
-  const fetchHistory = useCallback(async () => {
-    if (!userId) return;
-
-    setIsLoadingHistory(true);
-    try {
-      const token = await getToken();
-      if (!token) throw new Error('Missing token');
-
-      const supabase = createClerkSupabaseClient(getToken);
-      const { data, error } = await supabase
-        .from('journal_objective_review')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setHistoryReviews(data || []);
-    } catch (err) {
-      console.error('Error fetching history:', err);
-      Alert.alert('Error', 'Unable to load history. Please try again.');
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, [userId, getToken]);
-
-  useEffect(() => {
-    if (showHistory) {
-      void fetchHistory();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHistory]);
 
   return (
     <KeyboardAvoidingView
@@ -300,9 +227,9 @@ Response Format:
             </View>
           ) : (
             <ScrollView style={styles.historyScroll} contentContainerStyle={styles.historyContent}>
-              {historyReviews.map((review) => {
-                const isExpanded = expandedReviewId === review.id;
-                const date = new Date(review.created_at);
+              {(historyReviews ?? []).map((review) => {
+                const isExpanded = expandedReviewId === review._id;
+                const date = new Date(review._creationTime);
                 const formattedDate = date.toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -311,12 +238,12 @@ Response Format:
 
                 return (
                   <Pressable
-                    key={review.id}
+                    key={review._id}
                     style={[
                       styles.historyCard,
                       { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' },
                     ]}
-                    onPress={() => setExpandedReviewId(isExpanded ? null : review.id)}
+                    onPress={() => setExpandedReviewId(isExpanded ? null : review._id)}
                   >
                     <View style={styles.historyCardHeader}>
                       <Text style={styles.historyDate}>{formattedDate}</Text>
@@ -335,7 +262,7 @@ Response Format:
                             <Text style={styles.historySectionTitle}>Athlete&apos;s Voice</Text>
                           </View>
                           <Text style={[styles.historyText, { color: '#999' }]}>
-                            {review.athlete_vent}
+                            {review.athleteVent}
                           </Text>
                         </View>
 
@@ -347,7 +274,7 @@ Response Format:
                             </Text>
                           </View>
                           <Text style={[styles.historyText, { color: isDark ? '#FFF' : '#000' }]}>
-                            {review.coach_reframe}
+                            {review.coachReframe}
                           </Text>
                         </View>
                       </>

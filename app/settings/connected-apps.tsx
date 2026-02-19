@@ -3,7 +3,6 @@ import {
   authenticateOura,
   isOuraConnected,
   revokeOuraToken,
-  loadStoreTokenPreference,
   updateStoreTokenPreference,
   syncOuraRefreshTokenToDatabase,
   getOuraRefreshToken,
@@ -16,11 +15,13 @@ import {
   getWhoopRefreshToken,
 } from '@/services/whoop';
 import { useAuth } from '@clerk/clerk-expo';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,29 +40,22 @@ export default function ConnectedAppsScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId, getToken, isLoaded, isSignedIn } = useAuth();
+  const { userId, isLoaded, isSignedIn } = useAuth();
+  const convexUser = useQuery(api.users.getByUserId, userId ? { userId } : 'skip');
 
   const [ouraConnected, setOuraConnected] = useState(false);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [ouraLoading, setOuraLoading] = useState(false);
   const [whoopLoading, setWhoopLoading] = useState(false);
   const [storeToken, setStoreToken] = useState(false);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-  const hasLoadedStatusRef = useRef(false);
-  const getTokenRef = useRef(getToken);
 
   useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
-
-  const getClerkToken = useCallback(async () => {
-    try {
-      return await getTokenRef.current({ template: 'supabase' });
-    } catch (error) {
-      console.warn('Failed to get Clerk token for Supabase:', error);
-      return null;
+    if (convexUser?.storeToken !== undefined) {
+      setStoreToken(convexUser.storeToken);
     }
-  }, []);
+  }, [convexUser?.storeToken]);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const hasLoadedStatusRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -78,16 +72,14 @@ export default function ConnectedAppsScreen() {
     }
     (async () => {
       try {
-        const [ouraStatus, whoopStatus, storePreference] = await Promise.all([
+        const [ouraStatus, whoopStatus] = await Promise.all([
           isOuraConnected(userId),
-        isWhoopConnected(userId, getClerkToken),
-          loadStoreTokenPreference(userId, getClerkToken),
+          isWhoopConnected(userId),
         ]);
 
         if (!isActive) return;
         setOuraConnected(ouraStatus);
         setWhoopConnected(whoopStatus);
-        setStoreToken(storePreference);
         hasLoadedStatusRef.current = true;
       } catch (error) {
         console.error('Failed to check connection status:', error);
@@ -101,7 +93,7 @@ export default function ConnectedAppsScreen() {
     return () => {
       isActive = false;
     };
-  }, [isLoaded, isSignedIn, userId, getClerkToken]);
+  }, [isLoaded, isSignedIn, userId]);
 
   const handleOuraPress = async () => {
     if (!userId) return;
@@ -111,18 +103,18 @@ export default function ConnectedAppsScreen() {
       if (ouraConnected) {
         // Disconnect
         await revokeOuraToken(userId);
-        await syncOuraRefreshTokenToDatabase(userId, false, getClerkToken);
+        await syncOuraRefreshTokenToDatabase(userId, false);
         setOuraConnected(false);
         Alert.alert('Oura Connection', 'Oura account disconnected successfully.');
       } else {
         // Connect
-        const success = await authenticateOura(userId, getClerkToken);
+        const success = await authenticateOura(userId);
         if (success) {
           setOuraConnected(true);
           if (storeToken) {
             const refreshToken = await getOuraRefreshToken(userId);
             if (refreshToken) {
-              await syncOuraRefreshTokenToDatabase(userId, true, getClerkToken);
+              await syncOuraRefreshTokenToDatabase(userId, true);
             }
           }
           Alert.alert('Oura Connection', 'Oura account connected successfully!');
@@ -149,12 +141,12 @@ export default function ConnectedAppsScreen() {
       if (whoopConnected) {
         // Disconnect
         await revokeWhoopToken(userId);
-        await syncWhoopRefreshTokenToDatabase(userId, false, getClerkToken);
+        await syncWhoopRefreshTokenToDatabase(userId, false);
         setWhoopConnected(false);
         Alert.alert('WHOOP Connection', 'WHOOP account disconnected successfully.');
       } else {
         // Connect
-        const success = await authenticateWhoop(userId, getClerkToken);
+        const success = await authenticateWhoop(userId);
         if (success) {
           setWhoopConnected(true);
           if (storeToken) {
@@ -162,7 +154,7 @@ export default function ConnectedAppsScreen() {
             await new Promise((resolve) => setTimeout(resolve, 100));
             const refreshToken = await getWhoopRefreshToken(userId);
             if (refreshToken) {
-              await syncWhoopRefreshTokenToDatabase(userId, true, getClerkToken);
+              await syncWhoopRefreshTokenToDatabase(userId, true);
             }
           }
           Alert.alert('WHOOP Connection', 'WHOOP account connected successfully!');
@@ -186,26 +178,26 @@ export default function ConnectedAppsScreen() {
 
     setStoreToken(newValue);
     try {
-      await updateStoreTokenPreference(userId, newValue, getClerkToken);
+      await updateStoreTokenPreference(userId, newValue);
 
       if (newValue) {
         // Save tokens if connected
         if (ouraConnected) {
           const ouraRefreshToken = await getOuraRefreshToken(userId);
           if (ouraRefreshToken) {
-            await syncOuraRefreshTokenToDatabase(userId, true, getClerkToken);
+            await syncOuraRefreshTokenToDatabase(userId, true);
           }
         }
         if (whoopConnected) {
           const whoopRefreshToken = await getWhoopRefreshToken(userId);
           if (whoopRefreshToken) {
-            await syncWhoopRefreshTokenToDatabase(userId, true, getClerkToken);
+            await syncWhoopRefreshTokenToDatabase(userId, true);
           }
         }
       } else {
         // Clear stored tokens
-        await syncOuraRefreshTokenToDatabase(userId, false, getClerkToken);
-        await syncWhoopRefreshTokenToDatabase(userId, false, getClerkToken);
+        await syncOuraRefreshTokenToDatabase(userId, false);
+        await syncWhoopRefreshTokenToDatabase(userId, false);
       }
     } catch (error) {
       console.error('Failed to update store token preference:', error);

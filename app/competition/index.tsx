@@ -5,13 +5,16 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { formatToISO } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { LiftAttempt } from '@/models/Competition';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,16 +45,16 @@ export default function CompetitionReflectionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const { getToken, userId } = useAuth();
+  const { userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isEditMode = Boolean(editId);
-  const editItemId = Number(editId ?? 0);
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
-    });
-  }, [getToken]);
+  const insertComp = useMutation(api.compReports.insert);
+  const upsertComp = useMutation(api.compReports.upsert);
+  const existingComp = useQuery(
+    api.compReports.getById,
+    isEditMode && editId ? { id: editId as Id<'compReports'> } : 'skip'
+  );
 
   // Form state
   const [meetName, setMeetName] = useState('');
@@ -96,7 +99,7 @@ export default function CompetitionReflectionScreen() {
   const [focusNextMeet, setFocusNextMeet] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const isHydratingEditState = isEditMode && existingComp === undefined;
   const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -105,74 +108,52 @@ export default function CompetitionReflectionScreen() {
   }, []);
 
   React.useEffect(() => {
-    const hydrateEditState = async () => {
-      if (!isEditMode) {
-        setIsHydratingEditState(false);
-        return;
-      }
-      if (hasHydratedEditStateRef.current) return;
-      if (!userId || !editItemId) return;
+    if (!isEditMode || hasHydratedEditStateRef.current) return;
+    if (existingComp === undefined) return;
 
-      hasHydratedEditStateRef.current = true;
-      setIsHydratingEditState(true);
-      try {
-        const { data, error } = await supabase
-          .from('journal_comp_report')
-          .select('*')
-          .eq('id', editItemId)
-          .eq('user_id', userId)
-          .maybeSingle();
+    if (existingComp === null) {
+      Alert.alert('Entry not found', 'Unable to load this report.');
+      router.back();
+      return;
+    }
 
-        if (error) throw error;
-        if (!data) {
-          Alert.alert('Entry not found', 'Unable to load this report.');
-          router.back();
-          return;
-        }
-
-        setMeetName(data.meet ?? '');
-        setSelectedMeetType(data.selected_meet_type ?? 'Local');
-        setMeetDate(new Date(data.meet_date));
-        setBodyweight(data.bodyweight ?? '');
-        setSnatch1(data.snatch1 ?? '');
-        setSnatch2(data.snatch2 ?? '');
-        setSnatch3(data.snatch3 ?? '');
-        setCj1(data.cj1 ?? '');
-        setCj2(data.cj2 ?? '');
-        setCj3(data.cj3 ?? '');
-        setPerformanceRating(data.performance_rating ?? 3);
-        setPhysicalPreparedness(data.physical_preparedness_rating ?? 3);
-        setMentalPreparedness(data.mental_preparedness_rating ?? 3);
-        setPressureHandling(data.pressure_handling ?? 3);
-        setSatisfaction(data.satisfaction ?? 3);
-        setConfidence(data.confidence ?? 3);
-        setNutrition(data.nutrition ?? '');
-        setHydration(data.hydration ?? '');
-        setDidWell(data.did_well ?? '');
-        setWhatProudOf(data.what_proud_of ?? '');
-        setGoodFromTraining(data.good_from_training ?? '');
-        setCues(data.cues ?? '');
-        setWhatLearned(data.what_learned ?? '');
-        setNeedsWork(data.needs_work ?? '');
-        setFocusNextMeet(data.focus ?? '');
-      } catch (err) {
-        console.error('Error loading competition report for edit:', err);
-        Alert.alert('Unable to load entry', 'Please try again.');
-        router.back();
-      } finally {
-        setIsHydratingEditState(false);
-      }
-    };
-
-    hydrateEditState();
-  }, [editItemId, isEditMode, router, supabase, userId]);
+    hasHydratedEditStateRef.current = true;
+    setMeetName(existingComp.meet ?? '');
+    setSelectedMeetType(existingComp.selectedMeetType ?? 'Local');
+    setMeetDate(new Date(existingComp.meetDate));
+    setBodyweight(existingComp.bodyweight ?? '');
+    setSnatch1(existingComp.snatchAttempts?.[0]?.weight ?? '');
+    setSnatch2(existingComp.snatchAttempts?.[1]?.weight ?? '');
+    setSnatch3(existingComp.snatchAttempts?.[2]?.weight ?? '');
+    setCj1(existingComp.cjAttempts?.[0]?.weight ?? '');
+    setCj2(existingComp.cjAttempts?.[1]?.weight ?? '');
+    setCj3(existingComp.cjAttempts?.[2]?.weight ?? '');
+    setPerformanceRating(existingComp.performanceRating ?? 3);
+    setPhysicalPreparedness(existingComp.physicalPreparednessRating ?? 3);
+    setMentalPreparedness(existingComp.mentalPreparednessRating ?? 3);
+    setPressureHandling(existingComp.pressureHandling ?? 3);
+    setSatisfaction(existingComp.satisfaction ?? 3);
+    setConfidence(existingComp.confidence ?? 3);
+    setNutrition(existingComp.nutrition ?? '');
+    setHydration(existingComp.hydration ?? '');
+    setDidWell(existingComp.didWell ?? '');
+    setWhatProudOf(existingComp.whatProudOf ?? '');
+    setGoodFromTraining(existingComp.goodFromTraining ?? '');
+    setCues(existingComp.cues ?? '');
+    setWhatLearned(existingComp.whatLearned ?? '');
+    setNeedsWork(existingComp.needsWork ?? '');
+    setFocusNextMeet(existingComp.focus ?? '');
+  }, [isEditMode, existingComp, router]);
 
   const hasCompletedForm = meetName.length > 0 && bodyweight.length > 0;
 
-  const calculateBest = (lift1: string, lift2: string, lift3: string) => {
+  const buildAttempts = (w1: string, w2: string, w3: string): LiftAttempt[] =>
+    [w1, w2, w3].filter((w) => w.trim() !== '').map((weight) => ({ weight }));
+
+  const calculateBest = (lift1: string, lift2: string, lift3: string): number => {
     const values = [lift1, lift2, lift3]
-      .map((value) => Number(value))
-      .filter((value) => !Number.isNaN(value));
+      .map((v) => Number(v))
+      .filter((v) => !Number.isNaN(v) && v > 0);
     return values.length ? Math.max(...values) : 0;
   };
 
@@ -195,50 +176,42 @@ export default function CompetitionReflectionScreen() {
 
     setIsLoading(true);
     try {
+      const snatchAttempts = buildAttempts(snatch1, snatch2, snatch3);
+      const cjAttempts = buildAttempts(cj1, cj2, cj3);
+      const snatchBest = calculateBest(snatch1, snatch2, snatch3);
+      const cjBest = calculateBest(cj1, cj2, cj3);
+
       const payload = {
+        userId,
         meet: meetName,
-        selected_meet_type: selectedMeetType,
-        meet_date: formatToISO(meetDate),
-        bodyweight,
-        performance_rating: performanceRating,
-        physical_preparedness_rating: physicalPreparedness,
-        mental_preparedness_rating: mentalPreparedness,
-        nutrition,
-        hydration,
-        did_well: didWell,
-        needs_work: needsWork,
-        good_from_training: goodFromTraining,
+        selectedMeetType,
+        meetDate: formatToISO(meetDate),
+        bodyweight: bodyweight || undefined,
+        performanceRating,
+        physicalPreparednessRating: physicalPreparedness,
+        mentalPreparednessRating: mentalPreparedness,
+        nutrition: nutrition || undefined,
+        hydration: hydration || undefined,
+        didWell,
+        needsWork,
+        goodFromTraining,
         cues,
         focus: focusNextMeet,
         satisfaction,
         confidence,
-        pressure_handling: pressureHandling,
-        what_learned: whatLearned,
-        what_proud_of: whatProudOf,
-        snatch1,
-        snatch2,
-        snatch3,
-        cj1,
-        cj2,
-        cj3,
-        snatch_best: calculateBest(snatch1, snatch2, snatch3),
-        cj_best: calculateBest(cj1, cj2, cj3),
+        pressureHandling,
+        whatLearned: whatLearned || undefined,
+        whatProudOf: whatProudOf || undefined,
+        snatchAttempts: snatchAttempts.length ? snatchAttempts : undefined,
+        cjAttempts: cjAttempts.length ? cjAttempts : undefined,
+        snatchBest: snatchBest || undefined,
+        cjBest: cjBest || undefined,
       };
 
-      const { error } = isEditMode
-        ? await supabase
-            .from('journal_comp_report')
-            .update(payload)
-            .eq('id', editItemId)
-            .eq('user_id', userId)
-        : await supabase.from('journal_comp_report').insert({
-            ...payload,
-            user_id: userId,
-            created_at: new Date().toISOString(),
-          });
-
-      if (error) {
-        throw error;
+      if (isEditMode && editId) {
+        await upsertComp({ id: editId as Id<'compReports'>, ...payload });
+      } else {
+        await insertComp(payload);
       }
 
       trackCompReflectionSubmitted(meetName, selectedMeetType, performanceRating);
@@ -249,7 +222,7 @@ export default function CompetitionReflectionScreen() {
             onPress: () =>
               router.replace({
                 pathname: '/history/[id]',
-                params: { id: String(editItemId), type: 'Meets' },
+                params: { id: editId, type: 'Meets' },
               }),
           },
         ]);

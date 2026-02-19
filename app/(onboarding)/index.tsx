@@ -8,14 +8,14 @@ import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
 import { useRevenueCatContext } from '@/contexts/RevenueCatContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { User } from '@/models/User';
-import { createClerkSupabaseClient } from '@/services/supabase';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -129,12 +129,11 @@ export default function OnboardingScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const { hasProAccess, isRevenueCatEnabled, refreshCustomerInfo } = useRevenueCatContext();
 
   const { data, currentPage, updateData, nextPage, prevPage, totalPages } = useOnboarding();
 
-  // Accent color for question pages — matches the app's primary theme color
   const monoAccent = colors.blueEnergy;
 
   const [isLoading, setIsLoading] = useState(false);
@@ -143,11 +142,7 @@ export default function OnboardingScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasTrackedStart = useRef(false);
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
-    });
-  }, [getToken]);
+  const convexUpsert = useMutation(api.users.upsert);
 
   // Setup animation for final page
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -219,30 +214,23 @@ export default function OnboardingScreen() {
       const day = String(data.nextCompDate.getDate()).padStart(2, '0');
       const localDateString = `${year}-${month}-${day}`;
 
-      const userProfile: User = {
-        user_id: userId,
-        first_name: data.firstName,
-        last_name: data.lastName,
+      await convexUpsert({
+        userId,
+        firstName: data.firstName,
+        lastName: data.lastName,
         sport: data.sport,
-        years_of_experience: data.yearsExperience,
-        meets_per_year: data.meetsPerYear,
+        yearsOfExperience: data.yearsExperience,
+        meetsPerYear: data.meetsPerYear,
         goal: data.goal,
-        biggest_struggle: data.biggestStruggle,
-        training_days: data.trainingDays,
-        next_competition: data.nextComp,
-        next_competition_date: localDateString,
-        current_tracking_method: data.currentTrackingMethod,
-        biggest_frustration: data.biggestFrustration,
-        reflection_frequency: data.reflectionFrequency,
-        what_holding_back: data.whatHoldingBack,
-      };
-
-      // Use upsert to make onboarding completion idempotent
-      const { error } = await supabase
-        .from('journal_users')
-        .upsert(userProfile, { onConflict: 'user_id' });
-
-      if (error) throw error;
+        biggestStruggle: data.biggestStruggle,
+        trainingDays: data.trainingDays,
+        nextCompetition: data.nextComp,
+        nextCompetitionDate: localDateString,
+        currentTrackingMethod: data.currentTrackingMethod,
+        biggestFrustration: data.biggestFrustration,
+        reflectionFrequency: data.reflectionFrequency,
+        whatHoldingBack: data.whatHoldingBack,
+      });
 
       // Mark onboarding as complete (user-scoped key)
       await SecureStore.setItemAsync(`hasSeenOnboarding_${userId}`, 'true');

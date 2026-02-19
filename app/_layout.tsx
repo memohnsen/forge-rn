@@ -1,7 +1,6 @@
 import { SplashScreen } from '@/components/SplashScreen';
 import { RevenueCatProvider, useRevenueCatContext } from '@/contexts/RevenueCatContext';
 import { useEasUpdates } from '@/hooks/use-eas-updates';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import {
   identifyUser,
   posthog,
@@ -11,6 +10,13 @@ import {
   trackUserSignedOut,
 } from '@/utils/analytics';
 import { ClerkLoaded, ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { ConvexReactClient, useQuery } from 'convex/react';
+import { ConvexProviderWithClerk } from 'convex/react-clerk';
+import { api } from '@/convex/_generated/api';
+
+export const convexClient = new ConvexReactClient(
+  process.env.EXPO_PUBLIC_CONVEX_URL!
+);
 import * as Sentry from '@sentry/react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -68,7 +74,7 @@ if (!publishableKey) {
 }
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
   const { hasProAccess, isEntitlementsLoading, isRevenueCatEnabled } = useRevenueCatContext();
   const segments = useSegments();
   const router = useRouter();
@@ -76,6 +82,12 @@ function InitialLayout() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   const [hasCompletedPreAuthOnboarding, setHasCompletedPreAuthOnboarding] =
     useState<boolean | null>(null);
+
+  // Reactive Convex query — returns undefined while loading, null if not found
+  const convexUser = useQuery(
+    api.users.getByUserId,
+    isSignedIn && userId ? { userId } : 'skip'
+  );
   const [splashMinDone, setSplashMinDone] = useState(false);
   const [targetGroup, setTargetGroup] = useState<string | null>(null);
   const [routeReady, setRouteReady] = useState(false);
@@ -131,23 +143,15 @@ function InitialLayout() {
         return;
       }
 
-      // Check if user exists in database (meaning they've completed onboarding)
-      const supabase = createClerkSupabaseClient(async () => {
-        return getToken({ template: 'supabase', skipCache: true });
-      });
+      // convexUser is still loading — wait for it to resolve
+      if (convexUser === undefined) return;
 
-      const { data, error } = await supabase
-        .from('journal_users')
-        .select('user_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (data && !error) {
-        // User exists in DB, they've completed onboarding
+      if (convexUser !== null) {
+        // User exists in Convex, they've completed onboarding
         await SecureStore.setItemAsync(onboardingKey, 'true');
         setHasCompletedOnboarding(true);
       } else {
-        // User doesn't exist, needs onboarding
+        // User doesn't exist yet, needs onboarding
         setHasCompletedOnboarding(false);
       }
     } catch (err) {
@@ -156,7 +160,7 @@ function InitialLayout() {
     } finally {
       setIsCheckingOnboarding(false);
     }
-  }, [userId, getToken, getOnboardingKey]);
+  }, [userId, getOnboardingKey, getForceOnboardingKey, convexUser]);
 
   useEffect(() => {
     if (isSignedIn && userId) {
@@ -321,9 +325,11 @@ export default Sentry.wrap(function RootLayout() {
   const content = (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
       <ClerkLoaded>
-        <RevenueCatProvider>
-          <InitialLayout />
-        </RevenueCatProvider>
+        <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
+          <RevenueCatProvider>
+            <InitialLayout />
+          </RevenueCatProvider>
+        </ConvexProviderWithClerk>
       </ClerkLoaded>
     </ClerkProvider>
   );

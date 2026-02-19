@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
-import { createClerkSupabaseClient } from '@/services/supabase';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { User } from '@/models/User';
 import { CheckIn } from '@/models/CheckIn';
 import { SessionReport } from '@/models/Session';
@@ -13,189 +14,120 @@ const STREAK_RED = '#FF453A';
 const STREAK_GRAY = '#8E8E93';
 
 export const useHome = () => {
-  const { getToken } = useAuth();
-  const getTokenRef = useRef(getToken);
+  const { userId } = useAuth();
 
-  useEffect(() => {
-    getTokenRef.current = getToken;
-  }, [getToken]);
+  // Convex reactive queries
+  const convexUser = useQuery(api.users.getByUserId, userId ? { userId } : 'skip');
+  const convexCheckIns = useQuery(api.dailyCheckIns.listByUser, userId ? { userId } : 'skip');
+  const convexSessionReports = useQuery(api.sessionReports.listByUser, userId ? { userId } : 'skip');
 
-  // Create Supabase client with Clerk JWT
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getTokenRef.current({ template: 'supabase', skipCache: true });
-    });
-  }, []);
+  // Mutations
+  const convexUpsert = useMutation(api.users.upsert);
+  const convexUpdateMeet = useMutation(api.users.updateMeet);
+  const convexUpdateCoachEmail = useMutation(api.users.updateCoachEmail);
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [sessionReports, setSessionReports] = useState<SessionReport[]>([]);
   const [streakData, setStreakData] = useState<StreakData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const user = users[0];
+  const user = convexUser as User | null | undefined;
+  const checkIns = (convexCheckIns as CheckIn[] | undefined) ?? [];
+  const sessionReports = (convexSessionReports as SessionReport[] | undefined) ?? [];
+  const loadingHistory = convexCheckIns === undefined || convexSessionReports === undefined;
 
   // Computed values
   const streakDisplayText = streakData ? `${streakData.currentStreak}` : '0';
-
   const streakLabelText = 'day streak!';
 
   const streakStatusText = (() => {
     if (!streakData) return 'Start your streak today!';
-
-    if (streakData.currentStreak === 0 && streakData.isTodayTrainingDay) {
-      return 'Start your streak today!';
-    } else if (streakData.currentStreak === 0) {
-      return 'Rest day - streak safe!';
-    } else if (streakData.completedToday) {
-      return "You're on fire!";
-    } else if (streakData.isTodayTrainingDay && streakData.isActive) {
-      return 'Log today to keep your streak!';
-    } else if (streakData.isActive) {
-      return 'Keep it up!';
-    } else {
-      return 'Start a new streak!';
-    }
+    if (streakData.currentStreak === 0 && streakData.isTodayTrainingDay) return 'Start your streak today!';
+    if (streakData.currentStreak === 0) return 'Rest day - streak safe!';
+    if (streakData.completedToday) return "You're on fire!";
+    if (streakData.isTodayTrainingDay && streakData.isActive) return 'Log today to keep your streak!';
+    if (streakData.isActive) return 'Keep it up!';
+    return 'Start a new streak!';
   })();
 
   const streakColor = (() => {
     if (!streakData) return STREAK_GRAY;
-
-    if (streakData.currentStreak === 0) {
-      return STREAK_GRAY;
-    } else if (streakData.completedToday) {
-      return STREAK_ORANGE;
-    } else if (streakData.isTodayTrainingDay && streakData.isActive) {
-      return STREAK_RED;
-    } else if (streakData.isActive) {
-      return STREAK_ORANGE;
-    } else {
-      return STREAK_GRAY;
-    }
+    if (streakData.currentStreak === 0) return STREAK_GRAY;
+    if (streakData.completedToday) return STREAK_ORANGE;
+    if (streakData.isTodayTrainingDay && streakData.isActive) return STREAK_RED;
+    if (streakData.isActive) return STREAK_ORANGE;
+    return STREAK_GRAY;
   })();
 
   const streakIconName = streakData && streakData.currentStreak > 0 ? 'flame' : 'flame.fill';
 
   const daysUntilMeet = (() => {
-    if (!user?.next_competition_date) return 0;
-    const meetDate = new Date(user.next_competition_date);
+    if (!user?.nextCompetitionDate) return 0;
+    const meetDate = new Date(user.nextCompetitionDate);
     const today = new Date();
-    const diffTime = meetDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil((meetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   })();
 
-  const meetNameDisplay = (() => {
-    if (daysUntilMeet < 0) {
-      return 'Tap To Set Your Next Meet';
-    } else {
-      return user?.next_competition || 'No Meet Coming Up';
+  const meetNameDisplay = daysUntilMeet < 0
+    ? 'Tap To Set Your Next Meet'
+    : user?.nextCompetition || 'No Meet Coming Up';
+
+  const trainingDaysPerWeek = Object.keys(user?.trainingDays || {}).length;
+
+  const sessionsLeft = Math.ceil(Math.max(0, daysUntilMeet / 7) * trainingDaysPerWeek);
+
+  const daysUntilMeetText = daysUntilMeet < 0
+    ? 'Completed'
+    : daysUntilMeet === 0
+    ? 'Today!'
+    : `${daysUntilMeet} day${daysUntilMeet === 1 ? '' : 's'} left`;
+
+  const sessionsLeftText = daysUntilMeet <= 0
+    ? '0'
+    : `${sessionsLeft} session${sessionsLeft === 1 ? '' : 's'} left`;
+
+  const calculateStreak = useCallback(() => {
+    const trainingDays = user?.trainingDays || {};
+    const data = streakManager.calculateStreak(checkIns, sessionReports, trainingDays);
+    setStreakData(data);
+  }, [user, checkIns, sessionReports]);
+
+  useEffect(() => {
+    if (convexCheckIns !== undefined && convexSessionReports !== undefined) {
+      calculateStreak();
     }
-  })();
+  }, [convexCheckIns, convexSessionReports, calculateStreak]);
 
-  const trainingDaysPerWeek = Object.keys(user?.training_days || {}).length;
-
-  const sessionsLeft = (() => {
-    const weeksRemaining = Math.max(0, daysUntilMeet / 7);
-    const sessions = Math.ceil(weeksRemaining * trainingDaysPerWeek);
-    return sessions;
-  })();
-
-  const daysUntilMeetText = (() => {
-    if (daysUntilMeet < 0) {
-      return 'Completed';
-    } else if (daysUntilMeet === 0) {
-      return 'Today!';
-    } else {
-      return `${daysUntilMeet} day${daysUntilMeet === 1 ? '' : 's'} left`;
-    }
-  })();
-
-  const sessionsLeftText = (() => {
-    if (daysUntilMeet < 0 || daysUntilMeet === 0) {
-      return '0';
-    } else {
-      return `${sessionsLeft} session${sessionsLeft === 1 ? '' : 's'} left`;
-    }
-  })();
-
-  // API methods
-  const fetchUsers = useCallback(
-    async (userId: string) => {
-      setIsLoading(true);
-      console.log('[useHome] Fetching users for:', userId);
-      try {
-        const { data, error } = await supabase
-          .from('journal_users')
-          .select('*')
-          .eq('user_id', userId);
-
-        console.log('[useHome] Users response:', { data, error });
-        if (error) throw error;
-        setUsers(data || []);
-      } catch (err) {
-        console.error('[useHome] Error fetching users:', err);
-        setError(err as Error);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [supabase]
-  );
-
-  const fetchCheckIns = useCallback(
-    async (userId: string) => {
-      setLoadingHistory(true);
-      console.log('[useHome] Fetching check-ins for:', userId);
-      try {
-        const { data, error } = await supabase
-          .from('journal_daily_checkins')
-          .select('*')
-          .eq('user_id', userId)
-          .order('check_in_date', { ascending: false });
-
-        console.log('[useHome] Check-ins response:', { data, error });
-        if (error) throw error;
-        setCheckIns(data || []);
-      } catch (err) {
-        console.error('[useHome] Error fetching check-ins:', err);
-        setError(err as Error);
-      } finally {
-        setLoadingHistory(false);
-      }
-    },
-    [supabase]
-  );
-
-  const fetchSessionReports = useCallback(
-    async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('journal_session_report')
-          .select('*')
-          .eq('user_id', userId)
-          .order('session_date', { ascending: false });
-
-        if (error) throw error;
-        setSessionReports(data || []);
-      } catch (err) {
-        console.error('Error fetching session reports:', err);
-        setError(err as Error);
-      }
-    },
-    [supabase]
-  );
+  // No-op fetch methods — Convex is reactive, no manual fetching needed
+  const fetchUsers = useCallback(async (_userId: string) => {}, []);
+  const fetchCheckIns = useCallback(async (_userId: string) => {}, []);
+  const fetchSessionReports = useCallback(async (_userId: string) => {}, []);
+  const refreshData = useCallback(async (_userId: string) => {}, []);
 
   const submitUserProfile = useCallback(
-    async (userProfile: User) => {
+    async (userProfile: Omit<User, '_id' | '_creationTime'>) => {
+      if (!userId) return;
       setIsLoading(true);
       setError(null);
       try {
-        const { error } = await supabase.from('journal_users').insert(userProfile);
-
-        if (error) throw error;
+        await convexUpsert({
+          userId: userProfile.userId,
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          sport: userProfile.sport,
+          yearsOfExperience: userProfile.yearsOfExperience,
+          meetsPerYear: userProfile.meetsPerYear,
+          goal: userProfile.goal,
+          biggestStruggle: userProfile.biggestStruggle,
+          trainingDays: userProfile.trainingDays,
+          nextCompetition: userProfile.nextCompetition,
+          nextCompetitionDate: userProfile.nextCompetitionDate,
+          currentTrackingMethod: userProfile.currentTrackingMethod,
+          biggestFrustration: userProfile.biggestFrustration,
+          reflectionFrequency: userProfile.reflectionFrequency,
+          whatHoldingBack: userProfile.whatHoldingBack,
+          coachEmail: userProfile.coachEmail ?? undefined,
+          storeToken: userProfile.storeToken,
+        });
       } catch (err) {
         console.error('Error submitting user profile:', err);
         setError(err as Error);
@@ -203,73 +135,37 @@ export const useHome = () => {
         setIsLoading(false);
       }
     },
-    [supabase]
+    [userId, convexUpsert]
   );
 
   const updateUserMeet = useCallback(
-    async (
-      userId: string,
-      meetName: string,
-      meetDate: string,
-      fallbackProfile?: Partial<User>
-    ) => {
+    async (_userId: string, meetName: string, meetDate: string, fallbackProfile?: Partial<User>) => {
+      if (!userId) return false;
       setIsLoading(true);
       setError(null);
       try {
-        if (fallbackProfile) {
-          const payload = {
-            user_id: userId,
-            next_competition: meetName,
-            next_competition_date: meetDate,
-            ...fallbackProfile,
-          };
-          const cleanedPayload = Object.fromEntries(
-            Object.entries(payload).filter(([, value]) => value !== undefined)
-          );
-
-          const { error } = await supabase
-            .from('journal_users')
-            .upsert(cleanedPayload, { onConflict: 'user_id' });
-
-          if (error) throw error;
-          if (meetDate && meetName) {
-            try {
-              await notificationManager.storeMeetData(meetDate, meetName);
-            } catch (notificationError) {
-              console.error('[useHome] Failed to sync meet data to notifications', notificationError);
-            }
-          } else {
-            try {
-              await notificationManager.clearMeetData();
-            } catch (notificationError) {
-              console.error('[useHome] Failed to clear meet data in notifications', notificationError);
-            }
-          }
-          return true;
+        if (fallbackProfile && !user) {
+          await convexUpsert({
+            userId,
+            firstName: fallbackProfile.firstName ?? '',
+            lastName: fallbackProfile.lastName ?? '',
+            sport: fallbackProfile.sport ?? '',
+            yearsOfExperience: fallbackProfile.yearsOfExperience ?? 0,
+            meetsPerYear: fallbackProfile.meetsPerYear ?? 0,
+            goal: fallbackProfile.goal ?? '',
+            biggestStruggle: fallbackProfile.biggestStruggle ?? '',
+            trainingDays: fallbackProfile.trainingDays ?? {},
+            nextCompetition: meetName || undefined,
+            nextCompetitionDate: meetDate || undefined,
+          });
+        } else {
+          await convexUpdateMeet({ userId, nextCompetition: meetName, nextCompetitionDate: meetDate });
         }
 
-        const { error } = await supabase
-          .from('journal_users')
-          .update({
-            next_competition: meetName,
-            next_competition_date: meetDate,
-          })
-          .eq('user_id', userId);
-
-        if (error) throw error;
-
         if (meetDate && meetName) {
-          try {
-            await notificationManager.storeMeetData(meetDate, meetName);
-          } catch (notificationError) {
-            console.error('[useHome] Failed to sync meet data to notifications', notificationError);
-          }
+          try { await notificationManager.storeMeetData(meetDate, meetName); } catch {}
         } else {
-          try {
-            await notificationManager.clearMeetData();
-          } catch (notificationError) {
-            console.error('[useHome] Failed to clear meet data in notifications', notificationError);
-          }
+          try { await notificationManager.clearMeetData(); } catch {}
         }
         return true;
       } catch (err) {
@@ -280,22 +176,16 @@ export const useHome = () => {
         setIsLoading(false);
       }
     },
-    [supabase]
+    [userId, user, convexUpsert, convexUpdateMeet]
   );
 
   const updateCoachEmail = useCallback(
-    async (userId: string, email: string | null) => {
+    async (_userId: string, email: string | null) => {
+      if (!userId) return false;
       setIsLoading(true);
       setError(null);
       try {
-        const { error } = await supabase
-          .from('journal_users')
-          .update({
-            coach_email: email,
-          })
-          .eq('user_id', userId);
-
-        if (error) throw error;
+        await convexUpdateCoachEmail({ userId, coachEmail: email ?? '' });
         return true;
       } catch (err) {
         console.error('Error updating coach email:', err);
@@ -305,25 +195,12 @@ export const useHome = () => {
         setIsLoading(false);
       }
     },
-    [supabase]
+    [userId, convexUpdateCoachEmail]
   );
 
-  const calculateStreak = useCallback(() => {
-    const trainingDays = user?.training_days || {};
-    const data = streakManager.calculateStreak(checkIns, sessionReports, trainingDays);
-    setStreakData(data);
-  }, [user, checkIns, sessionReports]);
-
-  const refreshData = useCallback(
-    async (userId: string) => {
-      await Promise.all([fetchUsers(userId), fetchCheckIns(userId), fetchSessionReports(userId)]);
-      calculateStreak();
-    },
-    [fetchUsers, fetchCheckIns, fetchSessionReports, calculateStreak]
-  );
+  const users = user ? [user] : [];
 
   return {
-    // State
     users,
     user,
     checkIns,
@@ -332,8 +209,6 @@ export const useHome = () => {
     isLoading,
     loadingHistory,
     error,
-
-    // Computed values
     streakDisplayText,
     streakLabelText,
     streakStatusText,
@@ -345,8 +220,6 @@ export const useHome = () => {
     sessionsLeft,
     daysUntilMeetText,
     sessionsLeftText,
-
-    // Methods
     fetchUsers,
     fetchCheckIns,
     fetchSessionReports,

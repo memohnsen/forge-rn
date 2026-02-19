@@ -4,12 +4,14 @@ import { MultipleChoiceSection } from '@/components/ui/MultipleChoiceSection';
 import { SliderSection } from '@/components/ui/SliderSection';
 import { TextFieldSection } from '@/components/ui/TextFieldSection';
 import { colors } from '@/constants/colors';
-import { createClerkSupabaseClient } from '@/services/supabase';
 import { formatToISO } from '@/utils/dateFormatter';
 import { useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -43,16 +45,15 @@ export default function WorkoutReflectionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const { getToken, userId } = useAuth();
+  const { userId } = useAuth();
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isEditMode = Boolean(editId);
-  const editItemId = Number(editId ?? 0);
 
-  const supabase = useMemo(() => {
-    return createClerkSupabaseClient(async () => {
-      return getToken({ template: 'supabase', skipCache: true });
-    });
-  }, [getToken]);
+  const upsertForDate = useMutation(api.sessionReports.upsertForDate);
+  const existingSession = useQuery(
+    api.sessionReports.getById,
+    isEditMode && editId ? { id: editId as Id<'sessionReports'> } : 'skip'
+  );
 
   // Form state
   const [sessionDate, setSessionDate] = useState(new Date());
@@ -75,7 +76,7 @@ export default function WorkoutReflectionScreen() {
   const [whatWouldChange, setWhatWouldChange] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isHydratingEditState, setIsHydratingEditState] = useState(isEditMode);
+  const isHydratingEditState = isEditMode && existingSession === undefined;
   const hasHydratedEditStateRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -84,56 +85,31 @@ export default function WorkoutReflectionScreen() {
   }, []);
 
   React.useEffect(() => {
-    const hydrateEditState = async () => {
-      if (!isEditMode) {
-        setIsHydratingEditState(false);
-        return;
-      }
-      if (hasHydratedEditStateRef.current) return;
-      if (!userId || !editItemId) return;
+    if (!isEditMode || hasHydratedEditStateRef.current) return;
+    if (existingSession === undefined) return;
 
-      hasHydratedEditStateRef.current = true;
-      setIsHydratingEditState(true);
-      try {
-        const { data, error } = await supabase
-          .from('journal_session_report')
-          .select('*')
-          .eq('id', editItemId)
-          .eq('user_id', userId)
-          .maybeSingle();
+    if (existingSession === null) {
+      Alert.alert('Entry not found', 'Unable to load this reflection.');
+      router.back();
+      return;
+    }
 
-        if (error) throw error;
-        if (!data) {
-          Alert.alert('Entry not found', 'Unable to load this reflection.');
-          router.back();
-          return;
-        }
-
-        setSessionDate(new Date(data.session_date));
-        setTimeOfDay(data.time_of_day ?? 'Late Morning');
-        setSelectedLift(data.selected_lift ?? 'Squat');
-        setSelectedIntensity(data.selected_intensity ?? 'Moderate');
-        setSessionRPE(data.session_rpe ?? 3);
-        setMovementQuality(data.movement_quality ?? 3);
-        setFocus(data.focus ?? 3);
-        setMisses(data.misses ?? '0');
-        setCues(data.cues ?? '');
-        setFeeling(data.feeling ?? 3);
-        setSatisfaction(data.satisfaction ?? 3);
-        setConfidence(data.confidence ?? 3);
-        setWhatLearned(data.what_learned ?? '');
-        setWhatWouldChange(data.what_would_change ?? '');
-      } catch (err) {
-        console.error('Error loading session reflection for edit:', err);
-        Alert.alert('Unable to load entry', 'Please try again.');
-        router.back();
-      } finally {
-        setIsHydratingEditState(false);
-      }
-    };
-
-    hydrateEditState();
-  }, [editItemId, isEditMode, router, supabase, userId]);
+    hasHydratedEditStateRef.current = true;
+    setSessionDate(new Date(existingSession.sessionDate));
+    setTimeOfDay(existingSession.timeOfDay ?? 'Late Morning');
+    setSelectedLift(existingSession.selectedLift ?? 'Squat');
+    setSelectedIntensity(existingSession.selectedIntensity ?? 'Moderate');
+    setSessionRPE(existingSession.sessionRpe ?? 3);
+    setMovementQuality(existingSession.movementQuality ?? 3);
+    setFocus(existingSession.focus ?? 3);
+    setMisses(existingSession.misses ?? '0');
+    setCues(existingSession.cues ?? '');
+    setFeeling(existingSession.feeling ?? 3);
+    setSatisfaction(existingSession.satisfaction ?? 3);
+    setConfidence(existingSession.confidence ?? 3);
+    setWhatLearned(existingSession.whatLearned ?? '');
+    setWhatWouldChange(existingSession.whatWouldChange ?? '');
+  }, [isEditMode, existingSession, router]);
 
   const hasCompletedForm = cues.length > 0;
 
@@ -156,38 +132,24 @@ export default function WorkoutReflectionScreen() {
 
     setIsLoading(true);
     try {
-      const payload = {
-        session_date: formatToISO(sessionDate),
-        time_of_day: timeOfDay,
-        session_rpe: sessionRPE,
-        movement_quality: movementQuality,
+      await upsertForDate({
+        id: isEditMode && editId ? (editId as Id<'sessionReports'>) : undefined,
+        userId,
+        sessionDate: formatToISO(sessionDate),
+        timeOfDay,
+        sessionRpe: sessionRPE,
+        movementQuality,
         focus,
         misses,
         cues,
         feeling,
         satisfaction,
         confidence,
-        what_learned: whatLearned,
-        what_would_change: whatWouldChange,
-        selected_lift: selectedLift,
-        selected_intensity: selectedIntensity,
-      };
-
-      const { error } = isEditMode
-        ? await supabase
-            .from('journal_session_report')
-            .update(payload)
-            .eq('id', editItemId)
-            .eq('user_id', userId)
-        : await supabase.from('journal_session_report').insert({
-            ...payload,
-            user_id: userId,
-            created_at: new Date().toISOString(),
-          });
-
-      if (error) {
-        throw error;
-      }
+        whatLearned: whatLearned || undefined,
+        whatWouldChange: whatWouldChange || undefined,
+        selectedLift,
+        selectedIntensity,
+      });
 
       trackSessionReflectionSubmitted(selectedLift, selectedIntensity, sessionRPE);
       if (isEditMode) {
@@ -197,7 +159,7 @@ export default function WorkoutReflectionScreen() {
             onPress: () =>
               router.replace({
                 pathname: '/history/[id]',
-                params: { id: String(editItemId), type: 'Workouts' },
+                params: { id: editId, type: 'Workouts' },
               }),
           },
         ]);

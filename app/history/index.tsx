@@ -55,10 +55,10 @@ export default function HistoryScreen() {
     setRefreshing(false);
   };
 
-  const handleItemPress = (type: HistoryFilter, id: number) => {
+  const handleItemPress = (type: HistoryFilter, id: string) => {
     router.push({
       pathname: '/history/[id]',
-      params: { id: id.toString(), type },
+      params: { id, type },
     });
   };
 
@@ -103,11 +103,11 @@ export default function HistoryScreen() {
   };
 
   const renderCheckInItem = (item: CheckIn) => {
-    const scoreColor = getScoreColor(item.overall_score, 'Check-Ins');
+    const scoreColor = getScoreColor(item.overallScore, 'Check-Ins');
 
     return (
       <Pressable
-        key={item.id}
+        key={item._id}
         style={[
           styles.historyCard,
           {
@@ -118,7 +118,7 @@ export default function HistoryScreen() {
               : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${scoreColor}30`,
           },
         ]}
-        onPress={() => handleItemPress('Check-Ins', item.id!)}
+        onPress={() => handleItemPress('Check-Ins', item._id)}
       >
         <View style={styles.scoreCircle}>
           <LinearGradient
@@ -127,7 +127,7 @@ export default function HistoryScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.scoreCircleInner}
           >
-            <Text style={[styles.scoreText, { color: scoreColor }]}>{item.overall_score}</Text>
+            <Text style={[styles.scoreText, { color: scoreColor }]}>{item.overallScore}</Text>
           </LinearGradient>
         </View>
 
@@ -136,9 +136,9 @@ export default function HistoryScreen() {
             style={[styles.cardTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}
             numberOfLines={2}
           >
-            {item.selected_intensity} {item.selected_lift} Session
+            {item.selectedIntensity} {item.selectedLift} Session
           </Text>
-          <Text style={styles.cardSubtitle}>{formatDate(item.check_in_date)}</Text>
+          <Text style={styles.cardSubtitle}>{formatDate(item.checkInDate)}</Text>
         </View>
 
         <Ionicons name="chevron-forward" size={14} color="#999" />
@@ -147,12 +147,12 @@ export default function HistoryScreen() {
   };
 
   const renderSessionItem = (item: SessionReport) => {
-    const scoreColor = getScoreColor(item.session_rpe, 'Workouts');
+    const scoreColor = getScoreColor(item.sessionRpe, 'Workouts');
     const accentColor = getAccentColor('Workouts');
 
     return (
       <Pressable
-        key={item.id}
+        key={item._id}
         style={[
           styles.historyCard,
           {
@@ -163,7 +163,7 @@ export default function HistoryScreen() {
               : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accentColor}30`,
           },
         ]}
-        onPress={() => handleItemPress('Workouts', item.id!)}
+        onPress={() => handleItemPress('Workouts', item._id)}
       >
         <View style={styles.scoreCircle}>
           <LinearGradient
@@ -173,7 +173,7 @@ export default function HistoryScreen() {
             style={styles.scoreCircleInner}
           >
             <Text style={[styles.scoreTextSmall, { color: scoreColor }]}>
-              {item.session_rpe}/5
+              {item.sessionRpe}/5
             </Text>
           </LinearGradient>
         </View>
@@ -183,9 +183,9 @@ export default function HistoryScreen() {
             style={[styles.cardTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}
             numberOfLines={2}
           >
-            {item.selected_intensity} {item.selected_lift} Session
+            {item.selectedIntensity} {item.selectedLift} Session
           </Text>
-          <Text style={styles.cardSubtitle}>{formatDate(item.session_date)}</Text>
+          <Text style={styles.cardSubtitle}>{formatDate(item.sessionDate)}</Text>
         </View>
 
         <Ionicons name="chevron-forward" size={14} color="#999" />
@@ -195,17 +195,16 @@ export default function HistoryScreen() {
 
   const renderCompItem = (item: CompReport) => {
     const accentColor = getAccentColor('Meets');
-    const total =
-      (item.squat_best || 0) + (item.bench_best || 0) + (item.deadlift_best || 0);
-    const subtitleText = item.squat_best
-      ? `${item.squat_best}/${item.bench_best}/${item.deadlift_best}/${total}`
-      : item.snatch_best
-        ? `${item.snatch_best}/${item.cj_best}/${(item.snatch_best || 0) + (item.cj_best || 0)}`
+    const total = (item.squatBest || 0) + (item.benchBest || 0) + (item.deadliftBest || 0);
+    const subtitleText = item.squatBest
+      ? `${item.squatBest}/${item.benchBest}/${item.deadliftBest}/${total}`
+      : item.snatchBest
+        ? `${item.snatchBest}/${item.cjBest}/${(item.snatchBest || 0) + (item.cjBest || 0)}`
         : '';
 
     return (
       <Pressable
-        key={item.id}
+        key={item._id}
         style={[
           styles.historyCard,
           {
@@ -216,7 +215,7 @@ export default function HistoryScreen() {
               : `0 1px 2px rgba(0,0,0,0.06), 0 4px 12px ${accentColor}30`,
           },
         ]}
-        onPress={() => handleItemPress('Meets', item.id!)}
+        onPress={() => handleItemPress('Meets', item._id)}
       >
         <View style={styles.scoreCircle}>
           <LinearGradient
@@ -237,7 +236,7 @@ export default function HistoryScreen() {
             {item.meet}
           </Text>
           <Text style={styles.cardSubtitle}>
-            {formatDate(item.meet_date)}
+            {formatDate(item.meetDate)}
             {subtitleText ? ` • ${subtitleText}` : ''}
           </Text>
         </View>

@@ -1,6 +1,8 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
+import { convexClient } from '@/app/_layout';
+import { api } from '@/convex/_generated/api';
 
 // MARK: - Types
 
@@ -114,8 +116,6 @@ export interface WhoopDataResponse<T> {
 // MARK: - Constants
 
 const WHOOP_CLIENT_ID = process.env.EXPO_PUBLIC_WHOOP_CLIENT_ID || '';
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY || '';
 const REDIRECT_URI = 'forge://oauth/callback';
 const WHOOP_SCOPES = 'read:recovery read:sleep read:cycles offline';
 
@@ -212,39 +212,16 @@ const buildAuthorizationURL = (): string => {
   return `https://api.prod.whoop.com/oauth/oauth2/auth?${params.toString()}`;
 };
 
-const exchangeCodeForToken = async (
-  code: string,
-  clerkToken: string
-): Promise<WhoopTokenResponse> => {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/whoop-token-exchange`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${clerkToken}`,
-      apikey: SUPABASE_KEY,
-    },
-    body: JSON.stringify({ code }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token exchange failed: ${errorText}`);
-  }
-
-  return response.json();
+const exchangeCodeForToken = async (code: string): Promise<WhoopTokenResponse> => {
+  return convexClient.action(api.actions.whoopTokenExchange.exchangeToken, { code });
 };
 
 export const authenticateWhoop = async (
   userId: string,
-  getClerkToken: () => Promise<string | null>
+  getClerkToken?: () => Promise<string | null>
 ): Promise<boolean> => {
   try {
     console.log('[Whoop] Starting authentication flow');
-
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
 
     const authUrl = buildAuthorizationURL();
     console.log('[Whoop] Opening auth URL');
@@ -277,7 +254,7 @@ export const authenticateWhoop = async (
     }
 
     console.log('[Whoop] Exchanging code for token');
-    const tokenResponse = await exchangeCodeForToken(code, clerkToken);
+    const tokenResponse = await exchangeCodeForToken(code);
 
     await saveWhoopAccessToken(tokenResponse.access_token, userId);
     if (tokenResponse.refresh_token) {
@@ -298,7 +275,7 @@ export const authenticateWhoop = async (
 
 export const refreshWhoopToken = async (
   userId: string,
-  getClerkToken: () => Promise<string | null>
+  getClerkToken?: () => Promise<string | null>
 ): Promise<boolean> => {
   try {
     const refreshToken = await getWhoopRefreshToken(userId);
@@ -307,27 +284,9 @@ export const refreshWhoopToken = async (
       return false;
     }
 
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      console.warn('[Whoop] No Clerk token available');
-      return false;
-    }
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/whoop-token-exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
-        apikey: SUPABASE_KEY,
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+    const tokenResponse = await convexClient.action(api.actions.whoopTokenExchange.exchangeToken, {
+      refreshToken,
     });
-
-    if (!response.ok) {
-      throw new Error('Token refresh failed');
-    }
-
-    const tokenResponse: WhoopTokenResponse = await response.json();
 
     await saveWhoopAccessToken(tokenResponse.access_token, userId);
     if (tokenResponse.refresh_token) {
@@ -604,36 +563,15 @@ export const fetchWhoopDailyData = async (
 
 export const syncWhoopRefreshTokenToDatabase = async (
   userId: string,
-  shouldStore: boolean,
-  getClerkToken: () => Promise<string | null>
+  shouldStore: boolean
 ): Promise<void> => {
   try {
-    const clerkToken = await getClerkToken();
-    if (!clerkToken) {
-      throw new Error('No Clerk token available');
-    }
-
-    let refreshToken: string | null = null;
+    let whoopRefreshToken: string | undefined;
     if (shouldStore) {
-      refreshToken = await getWhoopRefreshToken(userId);
+      const token = await getWhoopRefreshToken(userId);
+      whoopRefreshToken = token ?? undefined;
     }
-
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/journal_users?user_id=eq.${userId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
-        apikey: SUPABASE_KEY,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ whoop_refresh_token: refreshToken }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Supabase PATCH failed (${response.status}): ${errorText}`);
-    }
-
+    await convexClient.mutation(api.users.updateWhoopToken, { userId, whoopRefreshToken });
     console.log('[Whoop] Synced refresh token to database');
   } catch (error) {
     console.error('[Whoop] Failed to sync refresh token to database:', error);
