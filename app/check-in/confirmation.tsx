@@ -83,8 +83,8 @@ export default function CheckInConfirmationScreen() {
     const absoluteDelta = Math.round(Math.abs(delta));
     if (absoluteDelta < SIGNIFICANT_TREND_MARGIN) return null;
     return delta > 0
-      ? { message: `Alert: You're trending upward ${absoluteDelta} points above your 2-week average.`, color: colors.scoreGreen }
-      : { message: `Alert: You're trending downward ${absoluteDelta} points below your 2-week average.`, color: colors.scoreRed };
+      ? { message: `Alert: You're trending upward ${absoluteDelta}% above your 2-week average.`, color: colors.scoreGreen }
+      : { message: `Alert: You're trending downward ${absoluteDelta}% below your 2-week average.`, color: colors.scoreRed };
   }, [overall, trendDateRange, recentCheckIns]);
 
   const handleDone = () => {

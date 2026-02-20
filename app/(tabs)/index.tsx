@@ -81,10 +81,6 @@ export default function HomeScreen() {
     }
   }, [userId]);
 
-  // Calculate streak when data changes
-  useEffect(() => {
-    calculateStreak();
-  }, [checkIns, user]);
 
   const handleRefresh = async () => {
     if (!userId) return;
@@ -94,7 +90,7 @@ export default function HomeScreen() {
   };
 
   const handleEditMeet = () => {
-    setNewMeetName(user?.next_competition || '');
+    setNewMeetName(user?.nextCompetition || '');
     const parseMeetDate = (value?: string) => {
       if (!value) return new Date();
       const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -105,7 +101,7 @@ export default function HomeScreen() {
       return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
     };
 
-    setNewMeetDate(parseMeetDate(user?.next_competition_date));
+    setNewMeetDate(parseMeetDate(user?.nextCompetitionDate));
     setEditMeetSheetShown(true);
   };
 
@@ -114,23 +110,14 @@ export default function HomeScreen() {
     const fallbackProfile = user
       ? undefined
       : {
-          first_name: clerkUser?.firstName || '',
-          last_name: clerkUser?.lastName || '',
+          firstName: clerkUser?.firstName || '',
+          lastName: clerkUser?.lastName || '',
           sport: 'Powerlifting',
-          years_of_experience: 0,
-          meets_per_year: 0,
+          yearsOfExperience: 0,
+          meetsPerYear: 0,
           goal: '',
-          biggest_struggle: '',
-          training_days: {},
-          current_tracking_method: '',
-          biggest_frustration: '',
-          reflection_frequency: '',
-          what_holding_back: '',
-          coach_email: null,
-          oura_refresh_token: null,
-          whoop_refresh_token: null,
-          store_token: false,
-          created_at: new Date().toISOString(),
+          biggestStruggle: '',
+          trainingDays: {},
         };
 
     const success = await updateUserMeet(
@@ -159,10 +146,10 @@ export default function HomeScreen() {
   });
 
   const headerHeight = 80 + insets.top;
-  const firstName = user?.first_name || clerkUser?.firstName || 'Athlete';
+  const firstName = user?.firstName || clerkUser?.firstName || 'Athlete';
   const profileInitial = (clerkUser?.firstName || firstName).charAt(0).toUpperCase();
 
-  const HeaderContent = () => (
+  const headerContent = (
     <View style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'flex-end', paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -220,7 +207,7 @@ export default function HomeScreen() {
           meetName={meetNameDisplay}
           daysUntilMeet={daysUntilMeet}
           daysUntilMeetText={daysUntilMeetText}
-          meetDate={user?.next_competition_date ? formatDate(user.next_competition_date) || 'N/A' : 'N/A'}
+          meetDate={user?.nextCompetitionDate ? formatDate(user.nextCompetitionDate) || 'N/A' : 'N/A'}
           sessionsLeftText={sessionsLeftText}
           onPress={handleEditMeet}
         />
@@ -251,13 +238,13 @@ export default function HomeScreen() {
       >
         {isIOS26OrLater ? (
           <GlassView style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden' }}>
-            <HeaderContent />
+            {headerContent}
           </GlassView>
         ) : (
           <View
             style={{ flex: 1, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', backgroundColor: isDark ? '#111' : '#E8E8EE' }}
           >
-            <HeaderContent />
+            {headerContent}
           </View>
         )}
       </Animated.View>

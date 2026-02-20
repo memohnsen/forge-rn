@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -26,7 +26,6 @@ export const useHome = () => {
   const convexUpdateMeet = useMutation(api.users.updateMeet);
   const convexUpdateCoachEmail = useMutation(api.users.updateCoachEmail);
 
-  const [streakData, setStreakData] = useState<StreakData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -34,6 +33,12 @@ export const useHome = () => {
   const checkIns = (convexCheckIns as CheckIn[] | undefined) ?? [];
   const sessionReports = (convexSessionReports as SessionReport[] | undefined) ?? [];
   const loadingHistory = convexCheckIns === undefined || convexSessionReports === undefined;
+
+  const streakData = useMemo<StreakData | null>(() => {
+    if (convexCheckIns === undefined || convexSessionReports === undefined) return null;
+    const trainingDays = user?.trainingDays ?? {};
+    return streakManager.calculateStreak(convexCheckIns as CheckIn[], convexSessionReports as SessionReport[], trainingDays);
+  }, [user, convexCheckIns, convexSessionReports]);
 
   // Computed values
   const streakDisplayText = streakData ? `${streakData.currentStreak}` : '0';
@@ -85,17 +90,7 @@ export const useHome = () => {
     ? '0'
     : `${sessionsLeft} session${sessionsLeft === 1 ? '' : 's'} left`;
 
-  const calculateStreak = useCallback(() => {
-    const trainingDays = user?.trainingDays || {};
-    const data = streakManager.calculateStreak(checkIns, sessionReports, trainingDays);
-    setStreakData(data);
-  }, [user, checkIns, sessionReports]);
-
-  useEffect(() => {
-    if (convexCheckIns !== undefined && convexSessionReports !== undefined) {
-      calculateStreak();
-    }
-  }, [convexCheckIns, convexSessionReports, calculateStreak]);
+  const calculateStreak = useCallback(() => {}, []);
 
   // No-op fetch methods — Convex is reactive, no manual fetching needed
   const fetchUsers = useCallback(async (_userId: string) => {}, []);
