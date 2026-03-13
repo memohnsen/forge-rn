@@ -490,6 +490,7 @@ export default function HistoryDetailsScreen() {
   const hasTrackedView = useRef(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [isSharingImage, setIsSharingImage] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const shareCardRef = useRef<View>(null);
 
   const userSport = user?.sport || 'Powerlifting';
@@ -639,17 +640,18 @@ Powered By Forge - Performance Journal`;
 
   const handleDelete = () => {
     const confirmDelete = async () => {
+      setIsDeleting(true);
+      router.back();
       const success = await deleteItem();
       if (success) {
         trackHistoryDeleted(type, 1);
         if (type === 'Check-Ins') {
-          trackCheckInDeleted(numId);
+          trackCheckInDeleted(0);
         } else if (type === 'Workouts') {
-          trackSessionReflectionDeleted(numId);
+          trackSessionReflectionDeleted(0);
         } else if (type === 'Meets') {
-          trackCompReflectionDeleted(numId);
+          trackCompReflectionDeleted(0);
         }
-        router.back();
       }
     };
 
@@ -770,7 +772,7 @@ Powered By Forge - Performance Journal`;
     );
   }
 
-  if (!item) {
+  if (!item && !isDeleting) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F2F2F7' }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
